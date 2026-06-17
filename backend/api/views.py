@@ -9,13 +9,17 @@ from django.db.models import Count, Q, Sum
 from .models import (
     User, Document, PurchaseOrder, PurchaseOrderItem, Supplier,
     Material, InventoryItem, Warehouse, ConstructionSite, Branch,
-    Notification, AuditLog
+    Notification, AuditLog, Address, DocumentFile, Contract, Invoice, Payment,
+    ProductionRequest, Ticket
 )
 from .serializers import (
     UserSerializer, UserRegisterSerializer, CustomTokenObtainPairSerializer,
     DocumentSerializer, SupplierSerializer, MaterialSerializer,
     InventoryItemSerializer, WarehouseSerializer, ConstructionSiteSerializer,
-    BranchSerializer, NotificationSerializer, DashboardStatsSerializer
+    BranchSerializer, NotificationSerializer, DashboardStatsSerializer,
+    AddressSerializer, DocumentFileSerializer, ContractSerializer,
+    InvoiceSerializer, PaymentSerializer, ProductionRequestSerializer,
+    TicketSerializer
 )
 
 
@@ -341,3 +345,197 @@ class NotificationMarkAllReadView(APIView):
     def post(self, request):
         Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({'message': 'Barcha bildirishnomalar o\'qilgan deb belgilandi'})
+
+
+# --- Address Views ---
+class AddressListView(generics.ListCreateAPIView):
+    """Manzillar ro'yxati."""
+    serializer_class = AddressSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = Address.objects.all()
+
+
+class AddressDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Manzil tahrirlash va o'chirish."""
+    serializer_class = AddressSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = Address.objects.all()
+
+
+# --- Document File Views ---
+class DocumentFileListView(generics.ListAPIView):
+    """Hujjat fayllari ro'yxati."""
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = DocumentFileSerializer
+    
+    def get_queryset(self):
+        doc_id = self.kwargs.get('doc_pk')
+        return DocumentFile.objects.filter(document_id=doc_id).order_by('-created_at')
+
+
+class DocumentFileUploadView(APIView):
+    """Hujjatga fayl yuklash."""
+    permission_classes = (permissions.IsAuthenticated,)
+    
+    def post(self, request, doc_pk):
+        document = Document.objects.filter(id=doc_pk).first()
+        if not document:
+            return Response({'error': 'Hujjat topilmadi'}, status=status.HTTP_404_NOT_FOUND)
+        
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'Fayl tanlanmadi'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Max 10MB
+        if file.size > 10 * 1024 * 1024:
+            return Response({'error': 'Fayl hajmi 10MB dan oshmasligi kerak'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        DocumentFile.objects.create(
+            document=document,
+            file=file,
+            original_filename=file.name,
+            file_size=file.size,
+            uploaded_by=request.user
+        )
+        
+        return Response({'message': 'Fayl muvaffaqiyatli yuklandi'}, status=status.HTTP_201_CREATED)
+
+
+# --- Contract Views ---
+class ContractListView(generics.ListAPIView):
+    """Shartnomalar ro'yxati."""
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = ContractSerializer
+    
+    def get_queryset(self):
+        return Contract.objects.select_related('document', 'supplier').order_by('-document__created_at')
+
+
+class ContractDetailView(generics.RetrieveAPIView):
+    """Shartnoma tafsilotlari."""
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = ContractSerializer
+    
+    def get_queryset(self):
+        return Contract.objects.select_related('document', 'supplier').order_by('-document__created_at')
+
+
+# --- Invoice Views ---
+class InvoiceListView(generics.ListCreateAPIView):
+    """Hisob-fakturalar ro'yxati."""
+    serializer_class = InvoiceSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = Invoice.objects.select_related('document', 'contract').order_by('-invoice_date')
+
+
+class InvoiceDetailView(generics.RetrieveUpdateAPIView):
+    """Hisob-faktura tafsilotlari."""
+    serializer_class = InvoiceSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = Invoice.objects.select_related('document', 'contract').order_by('-invoice_date')
+
+
+# --- Payment Views ---
+class PaymentListView(generics.ListAPIView):
+    """To'lovlar ro'yxati."""
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = PaymentSerializer
+    
+    def get_queryset(self):
+        return Payment.objects.select_related('invoice', 'performed_by').order_by('-payment_date')
+
+
+class PaymentCreateView(generics.CreateAPIView):
+    """To'lov yaratish."""
+    serializer_class = PaymentSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    
+    def perform_create(self, serializer):
+        invoice_id = self.kwargs.get('invoice_pk')
+        invoice = Invoice.objects.filter(id=invoice_id).first()
+        if not invoice:
+            raise serializers.ValidationError("Hisob-faktura topilmadi")
+        
+        payment = serializer.save(performed_by=self.request.user)
+        
+        # Update invoice paid amount
+        invoice.paid_amount += payment.amount
+        if invoice.paid_amount >= invoice.total_amount:
+            invoice.payment_status = 'paid'
+        elif invoice.paid_amount > 0:
+            invoice.payment_status = 'partial'
+        invoice.save()
+
+
+# --- Production Request Views ---
+class ProductionRequestListView(generics.ListCreateAPIView):
+    """Ishlab chiqarish zayavkalari ro'yxati."""
+    serializer_class = ProductionRequestSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    
+    def get_queryset(self):
+        return ProductionRequest.objects.select_related('site', 'created_by').order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        import datetime
+        today = datetime.datetime.now().strftime('%Y%m%d')
+        count = ProductionRequest.objects.filter(
+            created_at__date=datetime.date.today()
+        ).count() + 1
+        serializer.save(
+            created_by=self.request.user,
+            request_number=f"PR-{today}-{count:04d}"
+        )
+
+
+class ProductionRequestDetailView(generics.RetrieveUpdateAPIView):
+    """Ishlab chiqarish zayavka tafsilotlari."""
+    serializer_class = ProductionRequestSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    
+    def get_queryset(self):
+        return ProductionRequest.objects.select_related('site', 'created_by').order_by('-created_at')
+
+
+# --- Ticket Views ---
+class TicketListView(generics.ListCreateAPIView):
+    """Murojaatlar ro'yxati."""
+    serializer_class = TicketSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    
+    def get_queryset(self):
+        user = self.request.user
+        qs = Ticket.objects.select_related(
+            'created_by', 'assigned_to', 'branch', 'site'
+        ).order_by('-created_at')
+        
+        if user.is_staff or 'admin' in user.roles:
+            return qs
+        
+        if user.branch:
+            return qs.filter(branch=user.branch)
+        
+        return qs.filter(created_by=user)
+    
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class TicketDetailView(generics.RetrieveUpdateAPIView):
+    """Murojaat tafsilotlari."""
+    serializer_class = TicketSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    
+    def get_queryset(self):
+        user = self.request.user
+        qs = Ticket.objects.select_related(
+            'created_by', 'assigned_to', 'branch', 'site'
+        ).order_by('-created_at')
+        
+        if user.is_staff or 'admin' in user.roles:
+            return qs
+        
+        if user.branch:
+            return qs.filter(branch=user.branch)
+        
+        return qs.filter(created_by=user)

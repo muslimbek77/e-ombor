@@ -3,7 +3,9 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
     User, Branch, ConstructionSite, Warehouse, Material,
     InventoryItem, StockMovement, Document, DocumentApproval,
-    PurchaseOrder, PurchaseOrderItem, Supplier, Notification, AuditLog
+    PurchaseOrder, PurchaseOrderItem, Supplier, Notification, AuditLog,
+    Address, DocumentFile, Contract, Invoice, Payment,
+    ProductionRequest, Ticket
 )
 
 
@@ -108,3 +110,47 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_display = ['user', 'action', 'model_name', 'created_at']
     list_filter = ['action']
     search_fields = ['action', 'model_name']
+
+
+@admin.register(Address)
+class AddressAdmin(admin.ModelAdmin):
+    list_display = ['city', 'district', 'street', 'building']
+    search_fields = ['city', 'district', 'street']
+
+
+@admin.register(DocumentFile)
+class DocumentFileAdmin(admin.ModelAdmin):
+    list_display = ['document', 'original_filename', 'file_size', 'uploaded_by', 'created_at']
+    list_filter = ['created_at']
+
+
+@admin.register(Contract)
+class ContractAdmin(admin.ModelAdmin):
+    list_display = ['document', 'supplier', 'contract_number', 'signed_date', 'total_amount']
+    list_filter = ['signed_date']
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    list_display = ['document', 'invoice_number', 'invoice_date', 'total_amount', 'paid_amount', 'payment_status']
+    list_filter = ['payment_status']
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ['invoice', 'amount', 'payment_date', 'performed_by', 'payment_method']
+    list_filter = ['payment_method']
+
+
+@admin.register(ProductionRequest)
+class ProductionRequestAdmin(admin.ModelAdmin):
+    list_display = ['request_number', 'site', 'title', 'status', 'created_by', 'created_at']
+    list_filter = ['status']
+    search_fields = ['request_number', 'title']
+
+
+@admin.register(Ticket)
+class TicketAdmin(admin.ModelAdmin):
+    list_display = ['title', 'category', 'priority', 'status', 'created_by', 'branch', 'created_at']
+    list_filter = ['status', 'priority', 'category']
+    search_fields = ['title', 'description']

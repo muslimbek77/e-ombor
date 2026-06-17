@@ -5,7 +5,8 @@ from django.contrib.auth.password_validation import validate_password
 from .models import (
     User, Document, PurchaseOrder, PurchaseOrderItem, Supplier,
     Material, InventoryItem, Warehouse, ConstructionSite, Branch,
-    Notification
+    Notification, Address, DocumentFile, Contract, Invoice, Payment,
+    ProductionRequest, Ticket
 )
 
 User = get_user_model()
@@ -167,3 +168,97 @@ class DashboardStatsSerializer(serializers.Serializer):
     low_stock_items = serializers.IntegerField()
     recent_documents = DocumentSerializer(many=True, read_only=True)
     notifications = NotificationSerializer(many=True, read_only=True)
+
+
+class AddressSerializer(serializers.ModelSerializer):
+    """Manzillar serializeri."""
+    class Meta:
+        model = Address
+        fields = ['id', 'city', 'district', 'street', 'building']
+
+
+class DocumentFileSerializer(serializers.ModelSerializer):
+    """Hujjat fayllari serializeri."""
+    uploaded_by_name = serializers.CharField(source='uploaded_by.full_name', read_only=True)
+    
+    class Meta:
+        model = DocumentFile
+        fields = ['id', 'document', 'file', 'original_filename', 'file_size', 
+                  'uploaded_by', 'uploaded_by_name', 'created_at']
+        read_only_fields = ['id', 'created_at', 'uploaded_by_name']
+
+
+class ContractSerializer(serializers.ModelSerializer):
+    """Shartnomalar serializeri."""
+    document_doc_number = serializers.CharField(source='document.doc_number', read_only=True)
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    
+    class Meta:
+        model = Contract
+        fields = ['id', 'document', 'document_doc_number', 'supplier', 'supplier_name',
+                  'contract_number', 'signed_date', 'start_date', 'end_date',
+                  'total_amount', 'description']
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    """Hisob-fakturalar serializeri."""
+    document_doc_number = serializers.CharField(source='document.doc_number', read_only=True)
+    contract_number = serializers.CharField(source='contract.contract_number', read_only=True)
+    remaining_amount = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
+    payment_status_display = serializers.CharField(source='get_payment_status_display', read_only=True)
+    
+    class Meta:
+        model = Invoice
+        fields = ['id', 'document', 'document_doc_number', 'contract', 'contract_number',
+                  'invoice_number', 'invoice_date', 'due_date', 'total_amount', 
+                  'paid_amount', 'remaining_amount', 'payment_status', 
+                  'payment_status_display']
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    """To'lovlar serializeri."""
+    invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
+    performed_by_name = serializers.CharField(source='performed_by.full_name', read_only=True)
+    
+    class Meta:
+        model = Payment
+        fields = ['id', 'invoice', 'invoice_number', 'amount', 'payment_date',
+                  'payment_method', 'reference_number', 'performed_by', 
+                  'performed_by_name', 'notes']
+        read_only_fields = ['id', 'payment_date', 'performed_by_name']
+
+
+class ProductionRequestSerializer(serializers.ModelSerializer):
+    """Ishlab chiqarish zayavkalari serializeri."""
+    site_name = serializers.CharField(source='site.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = ProductionRequest
+        fields = ['id', 'site', 'site_name', 'request_number', 'title', 'description',
+                  'status', 'status_display', 'created_by', 'created_by_name', 
+                  'created_at', 'updated_at']
+        read_only_fields = ['id', 'request_number', 'created_at', 'updated_at', 'created_by_name', 'status_display']
+
+
+class TicketSerializer(serializers.ModelSerializer):
+    """Murojaat tizimi serializeri."""
+    created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
+    assigned_to_name = serializers.CharField(source='assigned_to.full_name', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
+    site_name = serializers.CharField(source='site.name', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    
+    class Meta:
+        model = Ticket
+        fields = ['id', 'title', 'description', 'category', 'category_display',
+                  'priority', 'priority_display', 'status', 'status_display',
+                  'created_by', 'created_by_name', 'assigned_to', 'assigned_to_name',
+                  'branch', 'branch_name', 'site', 'site_name',
+                  'response', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name', 
+                          'assigned_to_name', 'branch_name', 'site_name',
+                          'priority_display', 'status_display', 'category_display']

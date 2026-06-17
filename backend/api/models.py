@@ -358,3 +358,179 @@ class AuditLog(models.Model):
     
     def __str__(self):
         return f"{self.user} - {self.action} at {self.created_at}"
+
+
+class Address(models.Model):
+    """Manzillar jadvallari (shahar, tuman, ko'cha)."""
+    
+    city = models.CharField(max_length=100, db_index=True)
+    district = models.CharField(max_length=100, blank=True)
+    street = models.CharField(max_length=255, blank=True)
+    building = models.CharField(max_length=50, blank=True)
+    
+    class Meta:
+        db_table = 'addresses'
+        verbose_name = 'Manzil'
+        verbose_name_plural = 'Manzillar'
+        unique_together = ('city', 'district', 'street', 'building')
+    
+    def __str__(self):
+        return f"{self.city}, {self.district}, {self.street}"
+
+
+class DocumentFile(models.Model):
+    """Hujjatlarga biriktirilgan fayllar."""
+    
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='files')
+    file = models.FileField(upload_to='documents/%Y/%m/%d/')
+    original_filename = models.CharField(max_length=255)
+    file_size = models.IntegerField(help_text='Fayl hajmi byte da')
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploaded_files')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'document_files'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.document.doc_number} - {self.original_filename}"
+
+
+class Contract(models.Model):
+    """Shartnomalar."""
+    
+    document = models.OneToOneField(Document, on_delete=models.CASCADE, related_name='contract')
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='contracts')
+    contract_number = models.CharField(max_length=100, blank=True)
+    signed_date = models.DateField(null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    description = models.TextField(blank=True)
+    
+    class Meta:
+        db_table = 'contracts'
+    
+    def __str__(self):
+        return f"Contract - {self.contract_number or self.document.doc_number}"
+
+
+class Invoice(models.Model):
+    """Hisob-fakturalar (invoice)."""
+    
+    PAYMENT_STATUS_CHOICES = [
+        ('unpaid', 'To\'lanmagan'),
+        ('partial', 'Qisman to\'langan'),
+        ('paid', 'To\'liq to\'langan'),
+    ]
+    
+    document = models.OneToOneField(Document, on_delete=models.CASCADE, related_name='invoice')
+    contract = models.ForeignKey(Contract, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
+    invoice_number = models.CharField(max_length=100)
+    invoice_date = models.DateField()
+    due_date = models.DateField(null=True, blank=True)
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2)
+    paid_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='unpaid')
+    
+    class Meta:
+        db_table = 'invoices'
+        ordering = ['-invoice_date']
+    
+    def __str__(self):
+        return f"Invoice - {self.invoice_number}"
+    
+    @property
+    def remaining_amount(self):
+        return self.total_amount - self.paid_amount
+
+
+class Payment(models.Model):
+    """To'lovlar."""
+    
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=18, decimal_places=2)
+    payment_date = models.DateTimeField(auto_now_add=True)
+    payment_method = models.CharField(max_length=50, blank=True, help_text='Naqd, bank transfer va h.k.')
+    reference_number = models.CharField(max_length=100, blank=True, help_text='To\'lov referensi')
+    performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='payments')
+    notes = models.TextField(blank=True)
+    
+    class Meta:
+        db_table = 'payments'
+        ordering = ['-payment_date']
+    
+    def __str__(self):
+        return f"Payment - {self.amount} to Invoice {self.invoice.invoice_number}"
+
+
+class ProductionRequest(models.Model):
+    """Ishlab chiqarish bazasidan zayavkalar."""
+    
+    STATUS_CHOICES = [
+        ('pending', 'Kutilmoqda'),
+        ('approved', 'Tasdiqlandi'),
+        ('delivered', 'Yetkazildi'),
+        ('cancelled', 'Bekor qilindi'),
+    ]
+    
+    site = models.ForeignKey(ConstructionSite, on_delete=models.CASCADE, related_name='production_requests')
+    request_number = models.CharField(max_length=50, unique=True)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='production_requests')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'production_requests'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"PR - {self.request_number}"
+
+
+class Ticket(models.Model):
+    """Murojaat tizimi (Support/Ticketing)."""
+    
+    PRIORITY_CHOICES = [
+        ('low', 'Past'),
+        ('medium', 'O\'rta'),
+        ('high', 'Yuqori'),
+        ('urgent', 'Shoshilinch'),
+    ]
+    
+    CATEGORY_CHOICES = [
+        ('material_shortage', 'Material yetishmasligi'),
+        ('equipment', 'Texnika kerak'),
+        ('labor', 'Ishchi kuchi'),
+        ('other', 'Boshqa'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('open', 'Ochiq'),
+        ('in_progress', 'Jarayonda'),
+        ('resolved', 'Yechildi'),
+        ('closed', 'Yopildi'),
+    ]
+    
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_tickets')
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
+    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name='tickets')
+    site = models.ForeignKey(ConstructionSite, on_delete=models.SET_NULL, null=True, blank=True, related_name='tickets')
+    response = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'tickets'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Ticket - {self.title}"
