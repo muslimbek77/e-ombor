@@ -12,10 +12,14 @@ urlpatterns = [
     
     # Dashboard
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
+    path('analytics/overview/', views.AnalyticsOverviewView.as_view(), name='analytics-overview'),
     
     # Documents
     path('documents/', views.DocumentListCreateView.as_view(), name='document-list-create'),
+    path('documents/export/', views.DocumentsExportView.as_view(), name='document-export'),
     path('documents/<int:pk>/', views.DocumentDetailView.as_view(), name='document-detail'),
+    path('documents/<int:pk>/workflow/', views.DocumentWorkflowActionView.as_view(), name='document-workflow'),
+    path('documents/<int:pk>/archive/', views.DocumentArchiveToggleView.as_view(), name='document-archive-toggle'),
     
     # Document Files
     path('documents/<int:doc_pk>/files/', views.DocumentFileUploadView.as_view(), name='document-file-upload'),
@@ -34,7 +38,9 @@ urlpatterns = [
     
     # Inventory
     path('inventory/', views.InventoryListView.as_view(), name='inventory-list'),
+    path('inventory/export/', views.InventoryExportView.as_view(), name='inventory-export'),
     path('inventory/<int:pk>/', views.InventoryUpdateView.as_view(), name='inventory-update'),
+    path('stock-movements/', views.StockMovementListView.as_view(), name='stock-movement-list'),
     
     # Construction Sites
     path('sites/', views.ConstructionSiteListView.as_view(), name='site-list'),
@@ -70,10 +76,14 @@ urlpatterns = [
     
     # Tickets (Support)
     path('tickets/', views.TicketListView.as_view(), name='ticket-list'),
+    path('tickets/export/', views.TicketsExportView.as_view(), name='ticket-export'),
     path('tickets/<int:pk>/', views.TicketDetailView.as_view(), name='ticket-detail'),
     
     # Notifications
     path('notifications/', views.NotificationListView.as_view(), name='notification-list'),
     path('notifications/<int:pk>/read/', views.NotificationMarkReadView.as_view(), name='notification-read'),
     path('notifications/read-all/', views.NotificationMarkAllReadView.as_view(), name='notification-all-read'),
+
+    # Audit
+    path('audit-logs/', views.AuditLogListView.as_view(), name='audit-log-list'),
 ]

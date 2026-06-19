@@ -247,6 +247,8 @@ class Document(models.Model):
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, related_name='documents')
     total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     notes = models.TextField(blank=True)
+    is_archived = models.BooleanField(default=False)
+    archived_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
