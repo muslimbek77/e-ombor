@@ -6,13 +6,22 @@ import { formatDate, normalizeResults } from '../lib/format'
 export default function TicketsPage() {
   const { apiFetch, apiDownload } = useAuth()
   const [tickets, setTickets] = useState([])
+  const [sites, setSites] = useState([])
   const [filters, setFilters] = useState({
     status: '',
     priority: '',
     category: '',
   })
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [busyKey, setBusyKey] = useState('')
+  const [createForm, setCreateForm] = useState({
+    title: '',
+    description: '',
+    category: 'material_shortage',
+    priority: 'medium',
+    site: '',
+  })
 
   const loadTickets = async () => {
     setError('')
@@ -32,6 +41,19 @@ export default function TicketsPage() {
     loadTickets()
   }, [filters.status, filters.priority, filters.category])
 
+  useEffect(() => {
+    const loadSites = async () => {
+      try {
+        const data = await apiFetch('/api/sites/')
+        setSites(normalizeResults(data))
+      } catch (requestError) {
+        // Lookup failure should not block page rendering.
+      }
+    }
+
+    loadSites()
+  }, [apiFetch])
+
   const handleExport = async () => {
     setBusyKey('export-tickets')
     setError('')
@@ -43,6 +65,38 @@ export default function TicketsPage() {
       await apiDownload(`/api/tickets/export/?${params.toString()}`, 'tickets-export.csv')
     } catch (requestError) {
       setError(requestError.message || 'Eksportda xatolik yuz berdi.')
+    } finally {
+      setBusyKey('')
+    }
+  }
+
+  const handleCreateTicket = async (event) => {
+    event.preventDefault()
+    setBusyKey('create-ticket')
+    setError('')
+    setSuccessMessage('')
+    try {
+      await apiFetch('/api/tickets/', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: createForm.title,
+          description: createForm.description,
+          category: createForm.category,
+          priority: createForm.priority,
+          site: createForm.site || null,
+        }),
+      })
+      setCreateForm({
+        title: '',
+        description: '',
+        category: 'material_shortage',
+        priority: 'medium',
+        site: '',
+      })
+      setSuccessMessage('Yangi murojaat yaratildi.')
+      await loadTickets()
+    } catch (requestError) {
+      setError(requestError.message || 'Murojaat yaratishda xatolik yuz berdi.')
     } finally {
       setBusyKey('')
     }
@@ -60,6 +114,60 @@ export default function TicketsPage() {
       }
     >
       {error ? <div className="error-banner">{error}</div> : null}
+      {successMessage ? <div className="success-banner">{successMessage}</div> : null}
+
+      <section className="panel page-filters">
+        <div className="panel__header">
+          <h3>Yangi murojaat</h3>
+          <span>Create flow</span>
+        </div>
+        <form className="filters-grid" onSubmit={handleCreateTicket}>
+          <input
+            value={createForm.title}
+            onChange={(event) => setCreateForm((current) => ({ ...current, title: event.target.value }))}
+            placeholder="Murojaat sarlavhasi"
+            required
+          />
+          <input
+            value={createForm.description}
+            onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))}
+            placeholder="Muammo tavsifi"
+            required
+          />
+          <select
+            value={createForm.category}
+            onChange={(event) => setCreateForm((current) => ({ ...current, category: event.target.value }))}
+          >
+            <option value="material_shortage">Material yetishmasligi</option>
+            <option value="equipment">Texnika kerak</option>
+            <option value="labor">Ishchi kuchi</option>
+            <option value="other">Boshqa</option>
+          </select>
+          <select
+            value={createForm.priority}
+            onChange={(event) => setCreateForm((current) => ({ ...current, priority: event.target.value }))}
+          >
+            <option value="low">Past</option>
+            <option value="medium">O‘rta</option>
+            <option value="high">Yuqori</option>
+            <option value="urgent">Shoshilinch</option>
+          </select>
+          <select
+            value={createForm.site}
+            onChange={(event) => setCreateForm((current) => ({ ...current, site: event.target.value }))}
+          >
+            <option value="">Obyektsiz</option>
+            {sites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.name}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="tiny-button" disabled={busyKey === 'create-ticket'}>
+            Yaratish
+          </button>
+        </form>
+      </section>
 
       <section className="panel page-filters">
         <div className="filters-grid">
