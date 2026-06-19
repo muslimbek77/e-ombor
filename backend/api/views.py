@@ -403,6 +403,8 @@ class DocumentListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         site = serializer.validated_data.get("site")
         branch = site.branch if site else self.request.user.branch
+        if site and not is_admin(self.request.user) and self.request.user.branch_id and site.branch_id != self.request.user.branch_id:
+            raise serializers.ValidationError("Siz faqat o'z filiali obyektiga hujjat yarata olasiz")
         document = serializer.save(
             created_by=self.request.user,
             branch=branch,
@@ -659,7 +661,7 @@ class WarehouseDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 # --- Inventory Views ---
-class InventoryListView(generics.ListAPIView):
+class InventoryListView(generics.ListCreateAPIView):
     """Ombor zaxiralari ro'yxati."""
     serializer_class = InventoryItemSerializer
     permission_classes = (permissions.IsAuthenticated,)
@@ -675,6 +677,36 @@ class InventoryListView(generics.ListAPIView):
             self.request,
             {"warehouse": "warehouse_id", "material": "material_id"},
         )
+
+    def perform_create(self, serializer):
+        warehouse = serializer.validated_data["warehouse"]
+        quantity = serializer.validated_data.get("quantity", Decimal("0"))
+        if not is_admin(self.request.user) and self.request.user.branch_id and warehouse.branch_id != self.request.user.branch_id:
+            raise serializers.ValidationError("Siz faqat o'z filiali ombori uchun yozuv yarata olasiz")
+
+        item = serializer.save()
+        if quantity > 0:
+            StockMovement.objects.create(
+                warehouse=item.warehouse,
+                material=item.material,
+                movement_type="IN",
+                quantity=quantity,
+                performed_by=self.request.user,
+                notes="Boshlang'ich zaxira yaratildi",
+            )
+        create_audit_log(
+            self.request,
+            "inventory_created",
+            "InventoryItem",
+            item.id,
+            {
+                "warehouse_id": item.warehouse_id,
+                "material_id": item.material_id,
+                "quantity": str(item.quantity),
+                "branch_id": item.warehouse.branch_id,
+            },
+        )
+        create_low_stock_notifications(item)
 
 
 class InventoryUpdateView(APIView):
@@ -1133,14 +1165,42 @@ class TicketListView(generics.ListCreateAPIView):
             return qs
         
         if user.branch:
-            return qs.filter(branch=user.branch)
-        
-        return qs.filter(created_by=user)
+            qs = qs.filter(branch=user.branch)
+        else:
+            qs = qs.filter(created_by=user)
+
+        return filter_by_query_params(
+            qs,
+            self.request,
+            {"status": "status", "priority": "priority", "category": "category"},
+        )
     
     def perform_create(self, serializer):
-        serializer.save(
+        site = serializer.validated_data.get("site")
+        if site and not is_admin(self.request.user) and self.request.user.branch_id and site.branch_id != self.request.user.branch_id:
+            raise serializers.ValidationError("Siz faqat o'z filiali obyektiga murojaat yarata olasiz")
+
+        ticket = serializer.save(
             created_by=self.request.user,
-            branch=serializer.validated_data.get("branch") or self.request.user.branch,
+            branch=serializer.validated_data.get("branch") or (site.branch if site else self.request.user.branch),
+        )
+        create_audit_log(
+            self.request,
+            "ticket_created",
+            "Ticket",
+            ticket.id,
+            {
+                "branch_id": ticket.branch_id,
+                "priority": ticket.priority,
+                "status": ticket.status,
+            },
+        )
+        notify_branch_roles(
+            ticket.branch,
+            {"branch_manager", "admin"},
+            "Yangi murojaat yaratildi",
+            f"{ticket.title} nomli murojaat yaratildi.",
+            "info",
         )
 
 

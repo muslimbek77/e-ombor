@@ -6,11 +6,19 @@ import { formatDate, normalizeResults } from '../lib/format'
 export default function InventoryPage() {
   const { apiFetch, apiDownload } = useAuth()
   const [items, setItems] = useState([])
+  const [materials, setMaterials] = useState([])
+  const [warehouses, setWarehouses] = useState([])
   const [filters, setFilters] = useState({ material: '' })
   const [drafts, setDrafts] = useState({})
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [busyKey, setBusyKey] = useState('')
+  const [createForm, setCreateForm] = useState({
+    warehouse: '',
+    material: '',
+    quantity: '',
+    min_quantity: '',
+  })
 
   const loadInventory = async () => {
     setError('')
@@ -27,6 +35,23 @@ export default function InventoryPage() {
   useEffect(() => {
     loadInventory()
   }, [])
+
+  useEffect(() => {
+    const loadLookups = async () => {
+      try {
+        const [materialsData, warehousesData] = await Promise.all([
+          apiFetch('/api/materials/'),
+          apiFetch('/api/warehouses/'),
+        ])
+        setMaterials(normalizeResults(materialsData))
+        setWarehouses(normalizeResults(warehousesData))
+      } catch (requestError) {
+        // Lookup failure should not block page rendering.
+      }
+    }
+
+    loadLookups()
+  }, [apiFetch])
 
   const handleDraft = (id, field, value) => {
     setDrafts((current) => ({
@@ -73,6 +98,36 @@ export default function InventoryPage() {
     }
   }
 
+  const handleCreateInventory = async (event) => {
+    event.preventDefault()
+    setBusyKey('create-inventory')
+    setError('')
+    setSuccessMessage('')
+    try {
+      await apiFetch('/api/inventory/', {
+        method: 'POST',
+        body: JSON.stringify({
+          warehouse: Number(createForm.warehouse),
+          material: Number(createForm.material),
+          quantity: Number(createForm.quantity || 0),
+          min_quantity: Number(createForm.min_quantity || 0),
+        }),
+      })
+      setCreateForm({
+        warehouse: '',
+        material: '',
+        quantity: '',
+        min_quantity: '',
+      })
+      setSuccessMessage('Yangi inventar yozuvi yaratildi.')
+      await loadInventory()
+    } catch (requestError) {
+      setError(requestError.message || 'Inventar yozuvi yaratilmadi.')
+    } finally {
+      setBusyKey('')
+    }
+  }
+
   return (
     <AppShell
       eyebrow="Ombor moduli"
@@ -86,6 +141,58 @@ export default function InventoryPage() {
     >
       {error ? <div className="error-banner">{error}</div> : null}
       {successMessage ? <div className="success-banner">{successMessage}</div> : null}
+
+      <section className="panel page-filters">
+        <div className="panel__header">
+          <h3>Yangi inventar yozuvi</h3>
+          <span>Create flow</span>
+        </div>
+        <form className="filters-grid" onSubmit={handleCreateInventory}>
+          <select
+            value={createForm.warehouse}
+            onChange={(event) => setCreateForm((current) => ({ ...current, warehouse: event.target.value }))}
+            required
+          >
+            <option value="">Omborni tanlang</option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={createForm.material}
+            onChange={(event) => setCreateForm((current) => ({ ...current, material: event.target.value }))}
+            required
+          >
+            <option value="">Materialni tanlang</option>
+            {materials.map((material) => (
+              <option key={material.id} value={material.id}>
+                {material.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            step="0.001"
+            min="0"
+            value={createForm.quantity}
+            onChange={(event) => setCreateForm((current) => ({ ...current, quantity: event.target.value }))}
+            placeholder="Boshlang‘ich miqdor"
+          />
+          <input
+            type="number"
+            step="0.001"
+            min="0"
+            value={createForm.min_quantity}
+            onChange={(event) => setCreateForm((current) => ({ ...current, min_quantity: event.target.value }))}
+            placeholder="Minimal miqdor"
+          />
+          <button type="submit" className="tiny-button" disabled={busyKey === 'create-inventory'}>
+            Yaratish
+          </button>
+        </form>
+      </section>
 
       <section className="panel">
         <div className="panel__header">

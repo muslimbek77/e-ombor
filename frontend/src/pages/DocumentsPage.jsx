@@ -15,6 +15,7 @@ const WORKFLOW_ACTION_LABELS = {
 export default function DocumentsPage() {
   const { apiFetch, apiDownload } = useAuth()
   const [documents, setDocuments] = useState([])
+  const [sites, setSites] = useState([])
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [busyKey, setBusyKey] = useState('')
@@ -25,6 +26,14 @@ export default function DocumentsPage() {
     archived: 'false',
   })
   const [workflowDrafts, setWorkflowDrafts] = useState({})
+  const [createForm, setCreateForm] = useState({
+    doc_type: 'purchase_request',
+    title: '',
+    description: '',
+    site: '',
+    total_amount: '',
+    notes: '',
+  })
 
   const loadDocuments = async () => {
     setError('')
@@ -45,6 +54,19 @@ export default function DocumentsPage() {
   useEffect(() => {
     loadDocuments()
   }, [filters.archived, filters.status, filters.docType])
+
+  useEffect(() => {
+    const loadSites = async () => {
+      try {
+        const data = await apiFetch('/api/sites/')
+        setSites(normalizeResults(data))
+      } catch (requestError) {
+        // Lookup failure should not block page rendering.
+      }
+    }
+
+    loadSites()
+  }, [apiFetch])
 
   const handleSearchSubmit = async (event) => {
     event.preventDefault()
@@ -120,6 +142,40 @@ export default function DocumentsPage() {
     }
   }
 
+  const handleCreateDocument = async (event) => {
+    event.preventDefault()
+    setBusyKey('create-document')
+    setError('')
+    setSuccessMessage('')
+    try {
+      await apiFetch('/api/documents/', {
+        method: 'POST',
+        body: JSON.stringify({
+          doc_type: createForm.doc_type,
+          title: createForm.title,
+          description: createForm.description,
+          site: createForm.site || null,
+          total_amount: Number(createForm.total_amount || 0),
+          notes: createForm.notes,
+        }),
+      })
+      setCreateForm({
+        doc_type: 'purchase_request',
+        title: '',
+        description: '',
+        site: '',
+        total_amount: '',
+        notes: '',
+      })
+      setSuccessMessage('Yangi hujjat yaratildi.')
+      await loadDocuments()
+    } catch (requestError) {
+      setError(requestError.message || 'Hujjat yaratishda xatolik yuz berdi.')
+    } finally {
+      setBusyKey('')
+    }
+  }
+
   return (
     <AppShell
       eyebrow="Hujjatlar moduli"
@@ -133,6 +189,61 @@ export default function DocumentsPage() {
     >
       {error ? <div className="error-banner">{error}</div> : null}
       {successMessage ? <div className="success-banner">{successMessage}</div> : null}
+
+      <section className="panel page-filters">
+        <div className="panel__header">
+          <h3>Yangi hujjat</h3>
+          <span>Create flow</span>
+        </div>
+        <form className="filters-grid" onSubmit={handleCreateDocument}>
+          <select
+            value={createForm.doc_type}
+            onChange={(event) => setCreateForm((current) => ({ ...current, doc_type: event.target.value }))}
+          >
+            <option value="purchase_request">Purchase request</option>
+            <option value="contract">Contract</option>
+            <option value="invoice">Invoice</option>
+          </select>
+          <input
+            value={createForm.title}
+            onChange={(event) => setCreateForm((current) => ({ ...current, title: event.target.value }))}
+            placeholder="Sarlavha"
+            required
+          />
+          <select
+            value={createForm.site}
+            onChange={(event) => setCreateForm((current) => ({ ...current, site: event.target.value }))}
+          >
+            <option value="">Obyektsiz</option>
+            {sites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={createForm.total_amount}
+            onChange={(event) => setCreateForm((current) => ({ ...current, total_amount: event.target.value }))}
+            placeholder="Umumiy summa"
+          />
+          <input
+            value={createForm.description}
+            onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))}
+            placeholder="Qisqa tavsif"
+          />
+          <input
+            value={createForm.notes}
+            onChange={(event) => setCreateForm((current) => ({ ...current, notes: event.target.value }))}
+            placeholder="Izoh"
+          />
+          <button type="submit" className="tiny-button" disabled={busyKey === 'create-document'}>
+            Yaratish
+          </button>
+        </form>
+      </section>
 
       <section className="panel page-filters">
         <form className="filters-grid" onSubmit={handleSearchSubmit}>
