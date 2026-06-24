@@ -16,6 +16,9 @@ export default function DocumentsPage() {
   const { apiFetch, apiDownload } = useAuth()
   const [documents, setDocuments] = useState([])
   const [sites, setSites] = useState([])
+  const [selectedDocumentId, setSelectedDocumentId] = useState('')
+  const [documentFiles, setDocumentFiles] = useState([])
+  const [fileForm, setFileForm] = useState({ file: null })
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [busyKey, setBusyKey] = useState('')
@@ -67,6 +70,24 @@ export default function DocumentsPage() {
 
     loadSites()
   }, [apiFetch])
+
+  useEffect(() => {
+    const loadFiles = async () => {
+      if (!selectedDocumentId) {
+        setDocumentFiles([])
+        return
+      }
+
+      try {
+        const data = await apiFetch(`/api/documents/${selectedDocumentId}/files/list/`)
+        setDocumentFiles(normalizeResults(data))
+      } catch (requestError) {
+        setDocumentFiles([])
+      }
+    }
+
+    loadFiles()
+  }, [apiFetch, selectedDocumentId])
 
   const handleSearchSubmit = async (event) => {
     event.preventDefault()
@@ -176,6 +197,32 @@ export default function DocumentsPage() {
     }
   }
 
+  const handleUploadFile = async (event) => {
+    event.preventDefault()
+    if (!selectedDocumentId || !fileForm.file) return
+
+    setBusyKey('upload-file')
+    setError('')
+    setSuccessMessage('')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', fileForm.file)
+      await apiFetch(`/api/documents/${selectedDocumentId}/files/`, {
+        method: 'POST',
+        body: formData,
+      })
+      setFileForm({ file: null })
+      setSuccessMessage('Fayl muvaffaqiyatli yuklandi.')
+      const data = await apiFetch(`/api/documents/${selectedDocumentId}/files/list/`)
+      setDocumentFiles(normalizeResults(data))
+    } catch (requestError) {
+      setError(requestError.message || 'Fayl yuklashda xatolik yuz berdi.')
+    } finally {
+      setBusyKey('')
+    }
+  }
+
   return (
     <AppShell
       eyebrow="Hujjatlar moduli"
@@ -243,6 +290,48 @@ export default function DocumentsPage() {
             Yaratish
           </button>
         </form>
+      </section>
+
+      <section className="panel page-filters">
+        <div className="panel__header">
+          <h3>Hujjat biriktirmalari</h3>
+          <span>Files</span>
+        </div>
+        <form className="filters-grid" onSubmit={handleUploadFile}>
+          <select
+            value={selectedDocumentId}
+            onChange={(event) => setSelectedDocumentId(event.target.value)}
+          >
+            <option value="">Hujjatni tanlang</option>
+            {documents.map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.doc_number} • {doc.title}
+              </option>
+            ))}
+          </select>
+          <input
+            type="file"
+            onChange={(event) => setFileForm({ file: event.target.files?.[0] || null })}
+            accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png"
+          />
+          <button type="submit" className="tiny-button" disabled={busyKey === 'upload-file'}>
+            Fayl yuklash
+          </button>
+        </form>
+        <div className="stack-list" style={{ marginTop: '16px' }}>
+          {documentFiles.map((file) => (
+            <div key={file.id} className="feed-item compact">
+              <strong>{file.original_filename}</strong>
+              <p>
+                {file.file_size} bayt • {file.uploaded_by_name || 'Unknown'}
+              </p>
+              <a href={file.file} target="_blank" rel="noreferrer">
+                Faylni ochish
+              </a>
+            </div>
+          ))}
+          {selectedDocumentId && !documentFiles.length ? <p className="empty-state">Biriktirma yo‘q.</p> : null}
+        </div>
       </section>
 
       <section className="panel page-filters">
