@@ -134,8 +134,8 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Backend `http://localhost:8000` da ishga tushadi.
-DRF Swagger hujjatlari: `http://localhost:8000/api/schema/swagger-ui/`
+Backend `http://localhost:3000` da ishga tushadi.
+DRF Swagger hujjatlari: `http://localhost:3000/api/schema/swagger-ui/`
 
 ### Frontend o'rnatish
 
@@ -372,7 +372,7 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Admin panel: `http://localhost:8000/admin/`
+Admin panel: `http://localhost:3000/admin/`
 
 ---
 
