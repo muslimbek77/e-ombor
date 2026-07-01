@@ -34,6 +34,7 @@ PID_FILE_BACKEND="$PROJECT_DIR/.pids/backend.pid"
 PID_FILE_FRONTEND="$PROJECT_DIR/.pids/frontend.pid"
 LOG_BACKEND="$PROJECT_DIR/logs/backend.log"
 LOG_FRONTEND="$PROJECT_DIR/logs/frontend.log"
+BACKEND_PORT=3000
 
 # ============================================================
 # YORDAMCHI FUNKSIYALAR
@@ -149,16 +150,16 @@ run_backend() {
     cd "$BACKEND_DIR"
     source venv/bin/activate
 
-    log_info "Backend ishga tushirilmoqda... http://localhost:8000"
-    python manage.py runserver 0.0.0.0:8000 >> "$LOG_BACKEND" 2>&1 &
+    log_info "Backend ishga tushirilmoqda... http://localhost:${BACKEND_PORT}"
+    python manage.py runserver 0.0.0.0:${BACKEND_PORT} >> "$LOG_BACKEND" 2>&1 &
     echo $! > "$PID_FILE_BACKEND"
 
     # Server tayyorligini kutish
     sleep 3
     if is_backend_running; then
-        log_ok "Backend ishga tushdi: http://localhost:8000"
-        log_info "  DRF Swagger: http://localhost:8000/api/schema/swagger-ui/"
-        log_info "  Admin panel: http://localhost:8000/admin/"
+        log_ok "Backend ishga tushdi: http://localhost:${BACKEND_PORT}"
+        log_info "  DRF Swagger: http://localhost:${BACKEND_PORT}/api/schema/swagger-ui/"
+        log_info "  Admin panel: http://localhost:${BACKEND_PORT}/admin/"
     else
         log_error "Backend ishga tushmadi. Log: $LOG_BACKEND"
         return 1
@@ -261,7 +262,7 @@ status_all() {
     echo ""
 
     if is_backend_running; then
-        log_ok "Backend:  Ishlayapti (PID: $(cat "$PID_FILE_BACKEND")) — http://localhost:8000"
+        log_ok "Backend:  Ishlayapti (PID: $(cat "$PID_FILE_BACKEND")) — http://localhost:${BACKEND_PORT}"
     else
         log_error "Backend:  Ishlamayapti"
     fi
