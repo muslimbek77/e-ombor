@@ -134,3 +134,51 @@ Unauthorized: /api/auth/register/
 Watching for file changes with StatReloader
 Unauthorized: /api/auth/register/
 [03/Jul/2026 11:40:26] "POST /api/auth/register/ HTTP/1.1" 401 172
+[03/Jul/2026 12:26:33,465] - Broken pipe from ('192.168.4.151', 52128)
+Unauthorized: /api/auth/register/
+[03/Jul/2026 14:13:45] "POST /api/auth/register/ HTTP/1.1" 401 172
+Watching for file changes with StatReloader
+Unauthorized: /api/auth/register/
+[06/Jul/2026 10:16:20] "POST /api/auth/register/ HTTP/1.1" 401 172
+Unauthorized: /api/auth/register/
+[06/Jul/2026 10:16:38] "POST /api/auth/register/ HTTP/1.1" 401 58
+Unauthorized: /api/auth/register/
+[06/Jul/2026 10:16:45] "POST /api/auth/register/ HTTP/1.1" 401 58
+[06/Jul/2026 10:17:26] "GET /api/docs/ HTTP/1.1" 200 4644
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [AnalyticsOverviewView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [LogoutView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [CustomTokenRefreshView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [DashboardView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/serializers.py: Warning [DocumentListCreateView > DocumentSerializer]: unable to resolve type hint for function "get_allowed_actions". Consider using a type hint or @extend_schema_field. Defaulting to string.
+/home/rasulbek/another-project/e-ombor/backend/api/serializers.py: Warning [DocumentListCreateView > DocumentSerializer]: unable to resolve type hint for function "get_can_archive". Consider using a type hint or @extend_schema_field. Defaulting to string.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [DocumentFileUploadView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/serializers.py: Warning [DocumentDetailView > DocumentSerializer]: unable to resolve type hint for function "get_allowed_actions". Consider using a type hint or @extend_schema_field. Defaulting to string.
+/home/rasulbek/another-project/e-ombor/backend/api/serializers.py: Warning [DocumentDetailView > DocumentSerializer]: unable to resolve type hint for function "get_can_archive". Consider using a type hint or @extend_schema_field. Defaulting to string.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [DocumentArchiveToggleView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [DocumentWorkflowActionView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [DocumentsExportView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/serializers.py: Warning [InventoryListView > InventoryItemSerializer]: unable to resolve type hint for function "get_is_low_stock". Consider using a type hint or @extend_schema_field. Defaulting to string.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [InventoryUpdateView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [InventoryExportView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [NotificationMarkReadView]: exception raised while getting serializer. Hint: Is get_serializer_class() returning None or is get_queryset() not working without a request? Ignoring the view for now. (Exception: 'NotificationMarkReadView' should either include a `serializer_class` attribute, or override the `get_serializer_class()` method.)
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [NotificationMarkAllReadView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [PurchaseOrderListView]: exception raised while getting serializer. Hint: Is get_serializer_class() returning None or is get_queryset() not working without a request? Ignoring the view for now. (Exception: 'PurchaseOrderListView' should either include a `serializer_class` attribute, or override the `get_serializer_class()` method.)
+/home/rasulbek/another-project/e-ombor/backend/api/views.py: Error [TicketsExportView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
+[06/Jul/2026 10:17:26] "GET /api/schema/ HTTP/1.1" 200 204001
+/home/rasulbek/another-project/e-ombor/backend/api/views.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+July 06, 2026 - 10:15:53
+Django version 4.2.30, using settings 'e_ombor_backend.settings'
+Starting development server at http://0.0.0.0:3000/
+Quit the server with CONTROL-C.
+
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Bad Request: /api/auth/register/
+[06/Jul/2026 10:18:26] "POST /api/auth/register/ HTTP/1.1" 400 82
+[06/Jul/2026 10:18:44] "POST /api/auth/register/ HTTP/1.1" 201 841
+Unauthorized: /api/auth/user/
+[06/Jul/2026 10:19:15] "GET /api/auth/user/ HTTP/1.1" 401 172
+[06/Jul/2026 10:19:27] "GET /api/auth/user/ HTTP/1.1" 200 296
