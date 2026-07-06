@@ -197,6 +197,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     """JWT Token olish (login)."""
 
     serializer_class = CustomTokenObtainPairSerializer
+    permission_classes = (permissions.AllowAny,)
 
 
 class CustomTokenRefreshView(APIView):
@@ -236,6 +237,7 @@ class UserRegisterView(generics.CreateAPIView):
     """Ro'yxatdan o'tish."""
     queryset = User.objects.all()
     serializer_class = UserRegisterSerializer
+    permission_classes = (permissions.AllowAny,)
     
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
