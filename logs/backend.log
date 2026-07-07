@@ -182,3 +182,4 @@ Bad Request: /api/auth/register/
 Unauthorized: /api/auth/user/
 [06/Jul/2026 10:19:15] "GET /api/auth/user/ HTTP/1.1" 401 172
 [06/Jul/2026 10:19:27] "GET /api/auth/user/ HTTP/1.1" 200 296
+Watching for file changes with StatReloader
