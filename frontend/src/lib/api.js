@@ -24,18 +24,19 @@ export function storeTokens({ access = '', refresh = '' }) {
 
 export async function apiFetch(path, options = {}) {
   const { access } = getStoredTokens()
-  const headers = new Headers(options.headers || {})
+  const { auth = true, ...fetchOptions } = options
+  const headers = new Headers(fetchOptions.headers || {})
 
-  if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
+  if (!headers.has('Content-Type') && fetchOptions.body && !(fetchOptions.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
 
-  if (access) {
+  if (auth && access) {
     headers.set('Authorization', `Bearer ${access}`)
   }
 
   const response = await fetch(path, {
-    ...options,
+    ...fetchOptions,
     headers,
   })
 
@@ -58,11 +59,12 @@ export async function apiFetch(path, options = {}) {
   return data
 }
 
-export async function apiDownload(path, filename) {
+export async function apiDownload(path, filename, options = {}) {
   const { access } = getStoredTokens()
+  const { auth = true } = options
   const headers = new Headers()
 
-  if (access) {
+  if (auth && access) {
     headers.set('Authorization', `Bearer ${access}`)
   }
 

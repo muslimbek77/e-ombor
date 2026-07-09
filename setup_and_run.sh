@@ -112,29 +112,14 @@ EOF
 
     # Ma'lumotlar bazasi migratsiyasi
     log_info "Ma'lumotlar bazasi migratsiya qilinmoqda..."
-    python manage.py makemigrations api 2>/dev/null || true
-    python manage.py migrate
+    python3 manage.py makemigrations api 2>/dev/null || true
+    python3 manage.py migrate
     log_ok "Ma'lumotlar bazasi tayyor."
 
-    # Superuser yaratish (custom User modeli uchun get_user_model() ishlatiladi)
-    CUSTOM_USER_EXISTS=$(python manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-print('yes' if User.objects.filter(username='admin').exists() else 'no')
-" 2>/dev/null)
-
-    if [ "$CUSTOM_USER_EXISTS" != "yes" ]; then
-        log_warn "Superuser yaratilmagan. Yaratilmoqda..."
-        python manage.py shell << 'PYEOF'
-from django.contrib.auth import get_user_model
-User = get_user_model()
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@eombor.uz', 'admin123')
-    print('Superuser "admin" yaratildi.')
-else:
-    print('Superuser allaqachon mavjud.')
-PYEOF
-    fi
+    # Demo ma'lumotlar va loginlar
+    log_info "Demo ma'lumotlar yaratilmoqda..."
+    python3 manage.py seed_demo_data
+    log_ok "Demo ma'lumotlar tayyor."
 
     log_ok "Backend tayyor."
 }
@@ -151,7 +136,7 @@ run_backend() {
     source venv/bin/activate
 
     log_info "Backend ishga tushirilmoqda... http://localhost:${BACKEND_PORT}"
-    python manage.py runserver 0.0.0.0:${BACKEND_PORT} >> "$LOG_BACKEND" 2>&1 &
+    python3 manage.py runserver 0.0.0.0:${BACKEND_PORT} >> "$LOG_BACKEND" 2>&1 &
     echo $! > "$PID_FILE_BACKEND"
 
     # Server tayyorligini kutish

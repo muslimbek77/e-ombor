@@ -37,6 +37,7 @@ export function AuthProvider({ children }) {
     const data = await apiFetch('/api/auth/login/', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+      auth: false,
     })
 
     const nextTokens = { access: data.access, refresh: data.refresh }
