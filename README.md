@@ -182,6 +182,7 @@ Demo loginlar:
 - `prorab@eombor.uz` / `Prorab123!`
 - `branch@eombor.uz` / `Branch123!`
 - `architecture@eombor.uz` / `Arch12345!`
+- `site.engineer@eombor.uz` / `Engineer123!`
 
 ---
 

@@ -35,6 +35,8 @@ PID_FILE_FRONTEND="$PROJECT_DIR/.pids/frontend.pid"
 LOG_BACKEND="$PROJECT_DIR/logs/backend.log"
 LOG_FRONTEND="$PROJECT_DIR/logs/frontend.log"
 BACKEND_PORT=3000
+BACKEND_PYTHON="$BACKEND_DIR/venv/bin/python"
+BACKEND_PIP="$BACKEND_DIR/venv/bin/pip"
 
 # ============================================================
 # YORDAMCHI FUNKSIYALAR
@@ -86,13 +88,17 @@ setup_backend() {
     # Virtual muhitni yoqish
     source venv/bin/activate
 
+    # Venv ichidagi interpreter va pip dan foydalanamiz
+    BACKEND_PYTHON="$BACKEND_DIR/venv/bin/python"
+    BACKEND_PIP="$BACKEND_DIR/venv/bin/pip"
+
     # Pip yangilash
     log_info "Pip yangilanmoqda..."
-    pip install --upgrade pip -q
+    "$BACKEND_PIP" install --upgrade pip -q
 
     # Bog'liqliklarni o'rnatish
     log_info "Bog'liqliklar o'rnatilmoqda..."
-    pip install -r requirements.txt -q
+    "$BACKEND_PIP" install -r requirements.txt -q
     log_ok "Bog'liqliklar o'rnatildi."
 
     # .env fayli mavjudligini tekshirish
@@ -112,13 +118,13 @@ EOF
 
     # Ma'lumotlar bazasi migratsiyasi
     log_info "Ma'lumotlar bazasi migratsiya qilinmoqda..."
-    python3 manage.py makemigrations api 2>/dev/null || true
-    python3 manage.py migrate
+    "$BACKEND_PYTHON" manage.py makemigrations api 2>/dev/null || true
+    "$BACKEND_PYTHON" manage.py migrate
     log_ok "Ma'lumotlar bazasi tayyor."
 
     # Demo ma'lumotlar va loginlar
     log_info "Demo ma'lumotlar yaratilmoqda..."
-    python3 manage.py seed_demo_data
+    "$BACKEND_PYTHON" manage.py seed_demo_data
     log_ok "Demo ma'lumotlar tayyor."
 
     log_ok "Backend tayyor."
@@ -136,7 +142,7 @@ run_backend() {
     source venv/bin/activate
 
     log_info "Backend ishga tushirilmoqda... http://localhost:${BACKEND_PORT}"
-    python3 manage.py runserver 0.0.0.0:${BACKEND_PORT} >> "$LOG_BACKEND" 2>&1 &
+    "$BACKEND_PYTHON" manage.py runserver 0.0.0.0:${BACKEND_PORT} >> "$LOG_BACKEND" 2>&1 &
     echo $! > "$PID_FILE_BACKEND"
 
     # Server tayyorligini kutish

@@ -106,6 +106,12 @@ class Command(BaseCommand):
                 "address": "Samarqand sh., Universitet xiyoboni 12",
                 "phone": "+998662000002",
             },
+            {
+                "code": "BR-003",
+                "name": "Farg'ona Filiali",
+                "address": "Farg'ona sh., Mustaqillik ko'chasi 25",
+                "phone": "+998732000003",
+            },
         ]
         branches = []
         for spec in branch_specs:
@@ -114,7 +120,7 @@ class Command(BaseCommand):
         return branches
 
     def _seed_users(self, branches):
-        branch_main, branch_secondary = branches
+        branch_main, branch_secondary, branch_third = branches
         user_specs = [
             {
                 "email": "admin@eombor.uz",
@@ -198,6 +204,16 @@ class Command(BaseCommand):
                 "roles": ["architecture"],
                 "branch": branch_main,
             },
+            {
+                "email": "site.engineer@eombor.uz",
+                "password": "Engineer123!",
+                "first_name": "Aziza",
+                "last_name": "Qodirova",
+                "phone": "+998901111119",
+                "stir_inn": "123456789020",
+                "roles": ["architecture", "procurement"],
+                "branch": branch_third,
+            },
         ]
         self.demo_passwords = {}
         users = []
@@ -221,8 +237,9 @@ class Command(BaseCommand):
         return users
 
     def _seed_sites(self, branches, users):
-        branch_main, branch_secondary = branches
+        branch_main, branch_secondary, branch_third = branches
         prorab = self._user_by_email(users, "prorab@eombor.uz")
+        site_engineer = self._user_by_email(users, "site.engineer@eombor.uz")
         site_specs = [
             {
                 "code": "SITE-001",
@@ -251,6 +268,24 @@ class Command(BaseCommand):
                 "budget": Decimal("6400000.00"),
                 "prorab": prorab,
             },
+            {
+                "code": "SITE-004",
+                "name": "Farg'ona Logistics Hub",
+                "branch": branch_third,
+                "address": "Farg'ona sh., Alisher Navoiy ko'chasi 9",
+                "status": "active",
+                "budget": Decimal("11800000.00"),
+                "prorab": site_engineer,
+            },
+            {
+                "code": "SITE-005",
+                "name": "Qo'qon Residential Block",
+                "branch": branch_third,
+                "address": "Qo'qon sh., Marg'ilon yo'li 14",
+                "status": "paused",
+                "budget": Decimal("7200000.00"),
+                "prorab": site_engineer,
+            },
         ]
         sites = []
         for spec in site_specs:
@@ -259,7 +294,7 @@ class Command(BaseCommand):
         return sites
 
     def _seed_warehouses(self, branches):
-        branch_main, branch_secondary = branches
+        branch_main, branch_secondary, branch_third = branches
         warehouse_specs = [
             {
                 "code": "WH-TSH-01",
@@ -272,6 +307,12 @@ class Command(BaseCommand):
                 "name": "Samarqand Ombori",
                 "branch": branch_secondary,
                 "address": "Samarqand sh., Farhod ko'chasi 18",
+            },
+            {
+                "code": "WH-FRG-01",
+                "name": "Farg'ona Ta'minot Ombori",
+                "branch": branch_third,
+                "address": "Farg'ona sh., Qurilishchilar ko'chasi 6",
             },
         ]
         warehouses = []
@@ -324,6 +365,34 @@ class Command(BaseCommand):
                 "category": "Elektrika",
                 "description": "NYM 3x2.5 kabel",
             },
+            {
+                "code": "MAT-SHF-01",
+                "name": "Shifer",
+                "unit": "varaq",
+                "category": "Tom yopish",
+                "description": "Sanoat tomi uchun shifer",
+            },
+            {
+                "code": "MAT-PLS-01",
+                "name": "Plitka",
+                "unit": "m2",
+                "category": "Ichki pardoz",
+                "description": "Pol va devor plitkasi",
+            },
+            {
+                "code": "MAT-BOY-01",
+                "name": "Bo'yoq",
+                "unit": "litr",
+                "category": "Pardoz",
+                "description": "Ichki va tashqi bo'yoq",
+            },
+            {
+                "code": "MAT-QOL-01",
+                "name": "Qolip taxtasi",
+                "unit": "dona",
+                "category": "Yordamchi materiallar",
+                "description": "Beton quyish uchun qolip taxtasi",
+            },
         ]
         materials = []
         for spec in material_specs:
@@ -357,6 +426,22 @@ class Command(BaseCommand):
                 "email": "order@concreteline.uz",
                 "address": "Toshkent sh., Yangihayot tumani, Beton massiv 1",
             },
+            {
+                "code": "SUP-004",
+                "name": "Farg'ona Build Market",
+                "contact_person": "Muzaffar Jalilov",
+                "phone": "+998733110004",
+                "email": "sales@fbm.uz",
+                "address": "Farg'ona sh., Sayilgoh ko'chasi 11",
+            },
+            {
+                "code": "SUP-005",
+                "name": "Universal Finish",
+                "contact_person": "Dilnoza Karimova",
+                "phone": "+998712220005",
+                "email": "info@unifinish.uz",
+                "address": "Toshkent sh., Chilonzor tumani, Zargarlik ko'chasi 3",
+            },
         ]
         suppliers = []
         for spec in supplier_specs:
@@ -370,6 +455,8 @@ class Command(BaseCommand):
             {"city": "Samarqand", "district": "Siyob", "street": "Registon", "building": "44"},
             {"city": "Toshkent", "district": "Chilonzor", "street": "Qatortol", "building": "7"},
             {"city": "Bekobod", "district": "Navro'z", "street": "Massiv", "building": "2"},
+            {"city": "Farg'ona", "district": "Qirguli", "street": "Mustaqillik", "building": "25"},
+            {"city": "Qo'qon", "district": "Markaz", "street": "Marg'ilon yo'li", "building": "14"},
         ]
         addresses = []
         for spec in address_specs:
@@ -378,13 +465,14 @@ class Command(BaseCommand):
         return addresses
 
     def _seed_documents(self, branches, sites, users):
-        branch_main, branch_secondary = branches
+        branch_main, branch_secondary, branch_third = branches
         architecture = self._user_by_email(users, "architecture@eombor.uz")
         ceo = self._user_by_email(users, "ceo@eombor.uz")
         procurement = self._user_by_email(users, "procurement@eombor.uz")
         accountant = self._user_by_email(users, "accountant@eombor.uz")
         warehouse_user = self._user_by_email(users, "warehouse@eombor.uz")
         prorab = self._user_by_email(users, "prorab@eombor.uz")
+        site_engineer = self._user_by_email(users, "site.engineer@eombor.uz")
 
         doc_specs = [
             {
@@ -507,6 +595,42 @@ class Command(BaseCommand):
                 "total_amount": Decimal("26000000.00"),
                 "notes": "Rad etildi.",
             },
+            {
+                "doc_number": "PR-20260709-0006",
+                "doc_type": "purchase_request",
+                "status": "architecture",
+                "title": "Farg'ona loyiha inventari",
+                "description": "Farg'ona obyektlari uchun qo'shimcha inventar va asboblar.",
+                "created_by": site_engineer,
+                "site": sites[3],
+                "branch": branch_third,
+                "total_amount": Decimal("78000000.00"),
+                "notes": "Arxitektura ko'rigida.",
+            },
+            {
+                "doc_number": "CT-20260709-0003",
+                "doc_type": "contract",
+                "status": "contract",
+                "title": "Farg'ona Build Market shartnomasi",
+                "description": "Ichki pardoz materiallari bo'yicha shartnoma.",
+                "created_by": procurement,
+                "site": sites[3],
+                "branch": branch_third,
+                "total_amount": Decimal("78000000.00"),
+                "notes": "Yangi filial uchun.",
+            },
+            {
+                "doc_number": "IV-20260709-0004",
+                "doc_type": "invoice",
+                "status": "payment",
+                "title": "Qo'shimcha to'lov invoice",
+                "description": "Plitka va bo'yoq uchun invoice.",
+                "created_by": accountant,
+                "site": sites[4],
+                "branch": branch_third,
+                "total_amount": Decimal("62000000.00"),
+                "notes": "To'lov jarayonida.",
+            },
         ]
 
         documents = []
@@ -522,12 +646,15 @@ class Command(BaseCommand):
         architecture = self._user_by_email(users, "architecture@eombor.uz")
         ceo = self._user_by_email(users, "ceo@eombor.uz")
         procurement = self._user_by_email(users, "procurement@eombor.uz")
+        site_engineer = self._user_by_email(users, "site.engineer@eombor.uz")
         approvals = [
             (documents[1], architecture, "approved", "Loyiha talablariga mos."),
             (documents[2], ceo, "approved", "Budjet bo'yicha ma'qullandi."),
             (documents[3], procurement, "approved", "Shartnoma tuzishga ruxsat."),
             (documents[4], procurement, "approved", "To'lov bosqichiga o'tkazildi."),
             (documents[7], procurement, "approved", "Qabul qilish dalolatnomasi tayyor."),
+            (documents[10], site_engineer, "approved", "Farg'ona filialiga mos."),
+            (documents[11], procurement, "approved", "Yangi filial shartnomasi ma'qullandi."),
         ]
         for document, approver, action, comment in approvals:
             DocumentApproval.objects.get_or_create(
@@ -553,6 +680,14 @@ class Command(BaseCommand):
                 "items": [
                     (materials[2], Decimal("450"), Decimal("180000.00")),
                     (materials[3], Decimal("35000"), Decimal("1800.00")),
+                ],
+            },
+            {
+                "document": documents[10],
+                "supplier": suppliers[3],
+                "items": [
+                    (materials[6], Decimal("1200"), Decimal("35000.00")),
+                    (materials[7], Decimal("1800"), Decimal("95000.00")),
                 ],
             },
         ]
@@ -598,6 +733,16 @@ class Command(BaseCommand):
                 "total_amount": Decimal("310000000.00"),
                 "description": "Beton aralashma yetkazib berish bo'yicha shartnoma.",
             },
+            {
+                "document": documents[11],
+                "supplier": suppliers[3],
+                "contract_number": "CTR-20260709-003",
+                "signed_date": timezone.localdate(),
+                "start_date": timezone.localdate(),
+                "end_date": timezone.localdate().replace(year=timezone.localdate().year + 1),
+                "total_amount": Decimal("78000000.00"),
+                "description": "Farg'ona filialiga ta'minot shartnomasi.",
+            },
         ]
         contracts = []
         for spec in contract_specs:
@@ -640,6 +785,16 @@ class Command(BaseCommand):
                 "paid_amount": Decimal("125000000.00"),
                 "payment_status": "paid",
             },
+            {
+                "document": documents[12],
+                "contract": contracts[2],
+                "invoice_number": "INV-20260709-004",
+                "invoice_date": timezone.localdate(),
+                "due_date": timezone.localdate(),
+                "total_amount": Decimal("62000000.00"),
+                "paid_amount": Decimal("12000000.00"),
+                "payment_status": "partial",
+            },
         ]
         invoices = []
         for spec in invoice_specs:
@@ -669,6 +824,14 @@ class Command(BaseCommand):
                 "performed_by": accountant,
                 "notes": "To'liq yopildi.",
             },
+            {
+                "invoice": invoices[3],
+                "amount": Decimal("12000000.00"),
+                "payment_method": "bank transfer",
+                "reference_number": "PAY-20260709-003",
+                "performed_by": accountant,
+                "notes": "Farg'ona filialiga dastlabki to'lov.",
+            },
         ]
         for spec in payment_specs:
             Payment.objects.get_or_create(
@@ -684,6 +847,10 @@ class Command(BaseCommand):
             (warehouses[1], materials[3], Decimal("54000.000"), Decimal("12000.000")),
             (warehouses[1], materials[4], Decimal("180.000"), Decimal("40.000")),
             (warehouses[1], materials[5], Decimal("7500.000"), Decimal("1200.000")),
+            (warehouses[2], materials[6], Decimal("900.000"), Decimal("250.000")),
+            (warehouses[2], materials[7], Decimal("1400.000"), Decimal("300.000")),
+            (warehouses[2], materials[8], Decimal("800.000"), Decimal("200.000")),
+            (warehouses[2], materials[9], Decimal("160.000"), Decimal("50.000")),
         ]
         for warehouse, material, quantity, min_quantity in inventory_specs:
             InventoryItem.objects.get_or_create(
@@ -727,6 +894,22 @@ class Command(BaseCommand):
                 "performed_by": warehouse_user,
                 "notes": "Kabel boshqa omborga ko'chirildi.",
             },
+            {
+                "warehouse": warehouses[2],
+                "material": materials[6],
+                "movement_type": "IN",
+                "quantity": Decimal("300.000"),
+                "performed_by": warehouse_user,
+                "notes": "Shifer qabul qilindi.",
+            },
+            {
+                "warehouse": warehouses[2],
+                "material": materials[8],
+                "movement_type": "OUT",
+                "quantity": Decimal("90.000"),
+                "performed_by": warehouse_user,
+                "notes": "Bo'yoq ichki pardozga chiqarildi.",
+            },
         ]
         for spec in movement_specs:
             unique_note = spec["notes"]
@@ -745,6 +928,8 @@ class Command(BaseCommand):
             (documents[3], "contract_summary.pdf", "Shartnoma bo'yicha demo fayl."),
             (documents[4], "invoice_scan.pdf", "Invoice skan nusxasi."),
             (documents[0], "purchase_request.xlsx", "Xarid so'rovi demo jadvali."),
+            (documents[10], "fargona_purchase_request.pdf", "Farg'ona filialining demo hujjati."),
+            (documents[11], "fargona_contract.pdf", "Farg'ona filialiga tegishli demo kontrakt."),
         ]
         for document, filename, text in file_specs:
             content = ContentFile(text.encode("utf-8"))
@@ -761,6 +946,7 @@ class Command(BaseCommand):
 
     def _seed_production_requests(self, sites, users):
         prorab = self._user_by_email(users, "prorab@eombor.uz")
+        site_engineer = self._user_by_email(users, "site.engineer@eombor.uz")
         request_specs = [
             {
                 "site": sites[0],
@@ -786,6 +972,22 @@ class Command(BaseCommand):
                 "status": "delivered",
                 "created_by": prorab,
             },
+            {
+                "site": sites[3],
+                "request_number": "PRD-20260709-004",
+                "title": "Farg'ona ombori uchun qoplama",
+                "description": "Yangi ombor qoplama materiallari kerak.",
+                "status": "approved",
+                "created_by": site_engineer,
+            },
+            {
+                "site": sites[4],
+                "request_number": "PRD-20260709-005",
+                "title": "Qo'qon blokiga bo'yoq",
+                "description": "Ichki pardoz uchun bo'yoq so'raladi.",
+                "status": "pending",
+                "created_by": site_engineer,
+            },
         ]
         for spec in request_specs:
             ProductionRequest.objects.get_or_create(
@@ -794,9 +996,10 @@ class Command(BaseCommand):
             )
 
     def _seed_tickets(self, branches, sites, users):
-        branch_main, branch_secondary = branches
+        branch_main, branch_secondary, branch_third = branches
         prorab = self._user_by_email(users, "prorab@eombor.uz")
         warehouse_user = self._user_by_email(users, "warehouse@eombor.uz")
+        site_engineer = self._user_by_email(users, "site.engineer@eombor.uz")
         ticket_specs = [
             {
                 "title": "Sement zaxirasi kamayib ketdi",
@@ -846,6 +1049,30 @@ class Command(BaseCommand):
                 "site": None,
                 "response": "Masala yopildi.",
             },
+            {
+                "title": "Farg'ona omborida shifer yetishmayapti",
+                "description": "Yangi obyekt uchun shifer zaxirasi nolga tushdi.",
+                "category": "material_shortage",
+                "priority": "high",
+                "status": "open",
+                "created_by": site_engineer,
+                "assigned_to": warehouse_user,
+                "branch": branch_third,
+                "site": sites[3],
+                "response": "",
+            },
+            {
+                "title": "Qo'qon blokiga elektrchilar kerak",
+                "description": "Ichki ishlarda elektr montaj brigadasi kerak.",
+                "category": "labor",
+                "priority": "medium",
+                "status": "in_progress",
+                "created_by": site_engineer,
+                "assigned_to": warehouse_user,
+                "branch": branch_third,
+                "site": sites[4],
+                "response": "Brigada navbatga qo'yildi.",
+            },
         ]
         for spec in ticket_specs:
             Ticket.objects.get_or_create(
@@ -861,6 +1088,7 @@ class Command(BaseCommand):
         accountant = self._user_by_email(users, "accountant@eombor.uz")
         warehouse_user = self._user_by_email(users, "warehouse@eombor.uz")
         prorab = self._user_by_email(users, "prorab@eombor.uz")
+        site_engineer = self._user_by_email(users, "site.engineer@eombor.uz")
 
         notification_specs = [
             (admin, "Tizim tayyor", "Demo ma'lumotlar muvaffaqiyatli qo'shildi.", "info"),
@@ -869,6 +1097,8 @@ class Command(BaseCommand):
             (accountant, "To'lov kutilmoqda", "INV-20260709-001 bo'yicha qisman to'lov bor.", "warning"),
             (warehouse_user, "Ombor zaxirasi", "Sement zaxirasi minimal darajaga yaqin.", "info"),
             (prorab, "Zayavka qabul qilindi", "PRD-20260709-001 ishlab chiqishga qabul qilindi.", "success"),
+            (site_engineer, "Farg'ona bo'limi", "Farg'ona filialida yangi topshiriqlar bor.", "info"),
+            (warehouse_user, "Yangi yetkazib berish", "Shifer va bo'yoq partiyasi kutilmoqda.", "warning"),
         ]
         for user, title, message, notification_type in notification_specs:
             Notification.objects.get_or_create(
@@ -881,12 +1111,15 @@ class Command(BaseCommand):
         admin = self._user_by_email(users, "admin@eombor.uz")
         procurement = self._user_by_email(users, "procurement@eombor.uz")
         warehouse_user = self._user_by_email(users, "warehouse@eombor.uz")
+        site_engineer = self._user_by_email(users, "site.engineer@eombor.uz")
         audit_specs = [
             (admin, "seed_demo_data", "System", None, {"status": "completed"}, "127.0.0.1"),
             (procurement, "document_created", "Document", documents[0].id, {"doc_number": documents[0].doc_number}, "127.0.0.1"),
             (procurement, "supplier_added", "Supplier", suppliers[0].id, {"code": suppliers[0].code}, "127.0.0.1"),
             (warehouse_user, "inventory_updated", "InventoryItem", None, {"warehouse": warehouses[0].code if warehouses else None}, "127.0.0.1"),
             (admin, "site_created", "ConstructionSite", sites[0].id, {"code": sites[0].code}, "127.0.0.1"),
+            (site_engineer, "request_created", "ProductionRequest", None, {"site": sites[3].code}, "127.0.0.1"),
+            (procurement, "contract_signed", "Contract", documents[11].id if len(documents) > 11 else None, {"doc_number": documents[11].doc_number if len(documents) > 11 else None}, "127.0.0.1"),
         ]
         for user, action, model_name, object_id, details, ip_address in audit_specs:
             AuditLog.objects.get_or_create(
