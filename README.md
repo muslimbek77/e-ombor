@@ -163,6 +163,27 @@ DB_HOST=localhost
 DB_PORT=5432
 ```
 
+### Demo ma'lumotlar
+
+Backend tayyor bo'lgach:
+
+```bash
+cd backend
+python3 manage.py seed_demo_data
+```
+
+Demo loginlar:
+
+- `admin@eombor.uz` / `Admin123!`
+- `ceo@eombor.uz` / `Ceo12345!`
+- `procurement@eombor.uz` / `Procure123!`
+- `accountant@eombor.uz` / `Account123!`
+- `warehouse@eombor.uz` / `Warehouse123!`
+- `prorab@eombor.uz` / `Prorab123!`
+- `branch@eombor.uz` / `Branch123!`
+- `architecture@eombor.uz` / `Arch12345!`
+- `site.engineer@eombor.uz` / `Engineer123!`
+
 ---
 
 ## 📡 API Hujjatlari
