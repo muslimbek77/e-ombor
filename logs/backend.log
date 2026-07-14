@@ -910,3 +910,4 @@ Watching for file changes with StatReloader
 /home/rasulbek/project/e-ombor/backend/api/views.py: Error [PurchaseOrderListView]: exception raised while getting serializer. Hint: Is get_serializer_class() returning None or is get_queryset() not working without a request? Ignoring the view for now. (Exception: 'PurchaseOrderListView' should either include a `serializer_class` attribute, or override the `get_serializer_class()` method.)
 /home/rasulbek/project/e-ombor/backend/api/views.py: Error [TicketsExportView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
 [13/Jul/2026 10:02:44] "GET /api/schema/ HTTP/1.1" 200 204097
+Watching for file changes with StatReloader
