@@ -911,3 +911,30 @@ Watching for file changes with StatReloader
 /home/rasulbek/project/e-ombor/backend/api/views.py: Error [TicketsExportView]: unable to guess serializer. This is graceful fallback handling for APIViews. Consider using GenericAPIView as view base class, if view is under your control. Either way you may want to add a serializer_class (or method). Ignoring view for now.
 [13/Jul/2026 10:02:44] "GET /api/schema/ HTTP/1.1" 200 204097
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Performing system checks...
+
+System check identified no issues (0 silenced).
+July 15, 2026 - 11:05:52
+Django version 4.2.30, using settings 'e_ombor_backend.settings'
+Starting development server at http://0.0.0.0:3000/
+Quit the server with CONTROL-C.
+
+Watching for file changes with StatReloader
+[16/Jul/2026 10:05:44] "OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+[16/Jul/2026 10:05:44] "POST /api/auth/login/ HTTP/1.1" 200 996
+Not Found: /api/v1/api/warehouses/
+[16/Jul/2026 10:07:05] "GET /api/v1/api/warehouses/ HTTP/1.1" 404 11439
+/home/rasulbek/project/e-ombor/backend/venv/lib/python3.12/site-packages/rest_framework/pagination.py:198: UnorderedObjectListWarning: Pagination may yield inconsistent results with an unordered object_list: <class 'api.models.Warehouse'> QuerySet.
+  paginator = self.django_paginator_class(queryset, page_size)
+[16/Jul/2026 10:07:15] "GET /api/warehouses/ HTTP/1.1" 200 740
+[16/Jul/2026 10:07:28] "GET /api/tickets/ HTTP/1.1" 200 52
+[16/Jul/2026 10:07:35] "GET /api/suppliers/ HTTP/1.1" 200 1362
+Unauthorized: /api/sites/
+[16/Jul/2026 14:51:59] "GET /api/sites/ HTTP/1.1" 401 172
+Unauthorized: /api/sites/
+[16/Jul/2026 14:52:02] "GET /api/sites/ HTTP/1.1" 401 172
+[16/Jul/2026 14:52:56] "OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+[16/Jul/2026 14:52:56] "POST /api/auth/login/ HTTP/1.1" 200 996
+[16/Jul/2026 14:53:10] "GET /api/sites/ HTTP/1.1" 200 1885
+Watching for file changes with StatReloader
