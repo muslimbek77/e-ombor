@@ -3,6 +3,7 @@ import csv
 from io import StringIO
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Q, Sum, Count
 from django.http import HttpResponse
 from django.utils import timezone
@@ -52,6 +53,7 @@ from .serializers import (
     PaymentSerializer,
     ProductionRequestSerializer,
     PurchaseOrderItemSerializer,
+    StockMovementCreateSerializer,
     StockMovementSerializer,
     SupplierSerializer,
     TicketSerializer,
@@ -63,6 +65,7 @@ from .serializers import (
 
 ADMIN_ROLES = {"admin"}
 ARCHIVE_ROLES = {"admin", "procurement", "branch_manager"}
+STOCK_MOVEMENT_ROLES = {"admin", "warehouse"}
 WORKFLOW_RULES = {
     "created": {"submit": {"next_status": "architecture", "roles": {"prorab", "procurement", "admin"}}},
     "architecture": {
@@ -160,6 +163,28 @@ def notify_branch_roles(branch, roles, title, message, notification_type="info")
     filtered = [user for user in users if is_admin(user) or bool(set(user.roles or []).intersection(roles))]
     if filtered:
         notify_users(filtered, title, message, notification_type)
+
+
+class InsufficientStockError(Exception):
+    """Omborda yetarli qoldiq bo'lmaganda ko'tariladi."""
+
+
+def lock_inventory_item(warehouse, material, create_if_missing=False):
+    """InventoryItem ni satr darajasida qulflab qaytaradi (transaction ichida chaqirilsin)."""
+    item = InventoryItem.objects.select_for_update().filter(warehouse=warehouse, material=material).first()
+    if item is None and create_if_missing:
+        InventoryItem.objects.get_or_create(warehouse=warehouse, material=material, defaults={"quantity": 0})
+        item = InventoryItem.objects.select_for_update().get(warehouse=warehouse, material=material)
+    return item
+
+
+def ensure_sufficient_stock(item, warehouse, material, quantity):
+    available = item.quantity if item else Decimal("0")
+    if available < quantity:
+        raise InsufficientStockError(
+            f"{warehouse.name} omborida {material.name} yetarli emas "
+            f"(mavjud: {available}, so'ralgan: {quantity})"
+        )
 
 
 def create_low_stock_notifications(item):
@@ -799,22 +824,115 @@ class InventoryUpdateView(APIView):
         return Response(InventoryItemSerializer(item).data, status=status.HTTP_200_OK)
 
 
-class StockMovementListView(generics.ListAPIView):
-    """Materiallar harakati tarixi."""
+class StockMovementListView(generics.ListCreateAPIView):
+    """Materiallar harakati tarixi va yangi harakat yaratish."""
 
     permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = StockMovementSerializer
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return StockMovementCreateSerializer
+        return StockMovementSerializer
 
     def get_queryset(self):
         queryset = branch_scope(
-            StockMovement.objects.select_related("warehouse", "warehouse__branch", "material", "performed_by"),
+            StockMovement.objects.select_related(
+                "warehouse", "warehouse__branch", "target_warehouse", "material", "performed_by"
+            ),
             self.request.user,
             "warehouse__branch",
         ).order_by("-performed_at")
-        return filter_by_query_params(
+        queryset = filter_by_query_params(
             queryset,
             self.request,
-            {"warehouse": "warehouse_id", "material": "material_id", "movement_type": "movement_type"},
+            {"material": "material_id", "movement_type": "movement_type"},
+        )
+        # Ombor bo'yicha filtr TRANSFER ni ikkala tomonda ham ko'rsatadi
+        warehouse = self.request.query_params.get("warehouse")
+        if warehouse:
+            queryset = queryset.filter(Q(warehouse_id=warehouse) | Q(target_warehouse_id=warehouse))
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        if not (is_admin(request.user) or bool(set(request.user.roles or []).intersection(STOCK_MOVEMENT_ROLES))):
+            return Response(
+                {"error": "Ombor harakatini yaratish uchun sizda ruxsat yo'q"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = StockMovementCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        warehouse = data["warehouse"]
+        target_warehouse = data.get("target_warehouse")
+        material = data["material"]
+        movement_type = data["movement_type"]
+        quantity = data["quantity"]
+
+        # Admin uchun cheklov yo'q; qolganlar uchun manba ham, maqsad ham o'z filialida bo'lishi shart
+        if not is_admin(request.user):
+            for candidate in (warehouse, target_warehouse):
+                if candidate and candidate.branch_id != request.user.branch_id:
+                    return Response(
+                        {"error": "Siz faqat o'z filialingiz omborlari bilan ishlashingiz mumkin"},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
+        try:
+            with transaction.atomic():
+                if movement_type == "IN":
+                    item = lock_inventory_item(warehouse, material, create_if_missing=True)
+                    item.quantity += quantity
+                    item.save(update_fields=["quantity", "updated_at"])
+                    touched_items = [item]
+                elif movement_type == "OUT":
+                    item = lock_inventory_item(warehouse, material)
+                    ensure_sufficient_stock(item, warehouse, material, quantity)
+                    item.quantity -= quantity
+                    item.save(update_fields=["quantity", "updated_at"])
+                    touched_items = [item]
+                else:
+                    # Deadlock oldini olish uchun omborlarni id bo'yicha tartib bilan qulflaymiz
+                    first, second = sorted([warehouse, target_warehouse], key=lambda w: w.id)
+                    locked = {
+                        first.id: lock_inventory_item(first, material, create_if_missing=first == target_warehouse),
+                        second.id: lock_inventory_item(second, material, create_if_missing=second == target_warehouse),
+                    }
+                    source_item = locked[warehouse.id]
+                    target_item = locked[target_warehouse.id]
+                    ensure_sufficient_stock(source_item, warehouse, material, quantity)
+
+                    source_item.quantity -= quantity
+                    source_item.save(update_fields=["quantity", "updated_at"])
+                    target_item.quantity += quantity
+                    target_item.save(update_fields=["quantity", "updated_at"])
+                    touched_items = [source_item, target_item]
+
+                movement = serializer.save(performed_by=request.user)
+        except InsufficientStockError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        for item in touched_items:
+            create_low_stock_notifications(item)
+
+        create_audit_log(
+            request,
+            "stock_movement_created",
+            "StockMovement",
+            movement.id,
+            {
+                "movement_type": movement.movement_type,
+                "warehouse_id": movement.warehouse_id,
+                "target_warehouse_id": movement.target_warehouse_id,
+                "material_id": movement.material_id,
+                "quantity": str(movement.quantity),
+                "branch_id": movement.warehouse.branch_id,
+            },
+        )
+        return Response(
+            StockMovementSerializer(movement).data,
+            status=status.HTTP_201_CREATED,
         )
 
 

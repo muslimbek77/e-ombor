@@ -247,6 +247,7 @@ Demo loginlar:
 | GET | `/api/inventory/export/` | Inventarizatsiyani CSV formatida yuklab olish |
 | PATCH | `/api/inventory/{id}/` | Qoldiqni korrektirovka qilish |
 | GET | `/api/stock-movements/` | Ombor harakatlari tarixi |
+| POST | `/api/stock-movements/` | Yangi harakat (IN/OUT/TRANSFER) — qoldiqni avtomatik yangilaydi |
 
 ### Tashkilot
 

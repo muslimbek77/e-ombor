@@ -200,9 +200,25 @@ class StockMovement(models.Model):
     ]
     
     warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name='movements')
+    target_warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='incoming_movements',
+        null=True,
+        blank=True,
+        help_text="Faqat TRANSFER uchun: material ko'chiriladigan ombor",
+    )
     material = models.ForeignKey(Material, on_delete=models.CASCADE, related_name='movements')
     movement_type = models.CharField(max_length=10, choices=MOVEMENT_TYPES)
     quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    reference_doc = models.ForeignKey(
+        'Document',
+        on_delete=models.SET_NULL,
+        related_name='stock_movements',
+        null=True,
+        blank=True,
+        help_text="Harakat asosi bo'lgan hujjat (ixtiyoriy)",
+    )
     performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='movements')
     performed_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True)

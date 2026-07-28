@@ -304,6 +304,7 @@ class StockMovementSerializer(serializers.ModelSerializer):
     """Materiallar harakati serializeri."""
 
     warehouse_name = serializers.CharField(source="warehouse.name", read_only=True)
+    target_warehouse_name = serializers.CharField(source="target_warehouse.name", read_only=True)
     material_name = serializers.CharField(source="material.name", read_only=True)
     performed_by_name = serializers.CharField(source="performed_by.full_name", read_only=True)
     movement_type_display = serializers.CharField(source="get_movement_type_display", read_only=True)
@@ -314,17 +315,62 @@ class StockMovementSerializer(serializers.ModelSerializer):
             "id",
             "warehouse",
             "warehouse_name",
+            "target_warehouse",
+            "target_warehouse_name",
             "material",
             "material_name",
             "movement_type",
             "movement_type_display",
             "quantity",
+            "reference_doc",
             "performed_by",
             "performed_by_name",
             "performed_at",
             "notes",
         ]
         read_only_fields = fields
+
+
+class StockMovementCreateSerializer(serializers.ModelSerializer):
+    """Yangi materiallar harakatini yaratish serializeri."""
+
+    class Meta:
+        model = StockMovement
+        fields = [
+            "warehouse",
+            "target_warehouse",
+            "material",
+            "movement_type",
+            "quantity",
+            "reference_doc",
+            "notes",
+        ]
+
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Miqdor noldan katta bo'lishi kerak")
+        return value
+
+    def validate(self, attrs):
+        movement_type = attrs.get("movement_type")
+        warehouse = attrs.get("warehouse")
+        target_warehouse = attrs.get("target_warehouse")
+
+        if movement_type == "TRANSFER":
+            if not target_warehouse:
+                raise serializers.ValidationError(
+                    {"target_warehouse": "TRANSFER uchun maqsad ombor ko'rsatilishi shart"}
+                )
+            if target_warehouse == warehouse:
+                raise serializers.ValidationError(
+                    {"target_warehouse": "Maqsad ombor manba ombordan farq qilishi kerak"}
+                )
+        elif target_warehouse:
+            raise serializers.ValidationError(
+                {"target_warehouse": "target_warehouse faqat TRANSFER uchun ishlatiladi"}
+            )
+
+        return attrs
 
 
 class WarehouseSerializer(serializers.ModelSerializer):
