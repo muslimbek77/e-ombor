@@ -233,6 +233,45 @@ class DocumentWorkflowSerializer(serializers.Serializer):
     comment = serializers.CharField(required=False, allow_blank=True)
 
 
+class UserCreateSerializer(serializers.ModelSerializer):
+    """Admin panelidan yangi foydalanuvchi yaratish."""
+
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+
+    class Meta:
+        model = User
+        fields = [
+            "email", "password", "first_name", "last_name", "phone", "stir_inn",
+            "roles", "branch", "is_active", "is_staff",
+        ]
+
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        return User.objects.create_user(password=password, **validated_data)
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    """Admin panelidan foydalanuvchini tahrirlash. Parol faqat berilgan bo'lsa o'zgaradi."""
+
+    password = serializers.CharField(write_only=True, required=False, validators=[validate_password])
+
+    class Meta:
+        model = User
+        fields = [
+            "first_name", "last_name", "email", "phone", "stir_inn",
+            "roles", "branch", "is_active", "is_staff", "password",
+        ]
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance
+
+
 class PurchaseOrderItemSerializer(serializers.ModelSerializer):
     """Xarid buyurtma qatorlari serializeri."""
 
@@ -241,6 +280,93 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseOrderItem
         fields = ["id", "purchase_order", "material", "material_name", "quantity", "unit_price", "total_price"]
+
+
+class PurchaseOrderItemInputSerializer(serializers.ModelSerializer):
+    """Xarid buyurtmasini yaratish/tahrirlashda nested qator kiritish uchun."""
+
+    class Meta:
+        model = PurchaseOrderItem
+        fields = ["material", "quantity", "unit_price", "total_price"]
+        extra_kwargs = {"total_price": {"required": False}}
+
+    def validate(self, attrs):
+        if not attrs.get("total_price"):
+            attrs["total_price"] = attrs["quantity"] * attrs["unit_price"]
+        return attrs
+
+
+class PurchaseOrderSerializer(serializers.ModelSerializer):
+    """Xarid buyurtmasi - o'qish uchun (hujjat va qatorlar bilan)."""
+
+    doc_number = serializers.CharField(source="document.doc_number", read_only=True)
+    title = serializers.CharField(source="document.title", read_only=True)
+    doc_status = serializers.CharField(source="document.status", read_only=True)
+    total_amount = serializers.DecimalField(
+        source="document.total_amount", max_digits=18, decimal_places=2, read_only=True
+    )
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True, default=None)
+    items = PurchaseOrderItemSerializer(many=True, read_only=True)
+    created_at = serializers.DateTimeField(source="document.created_at", read_only=True)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = [
+            "id",
+            "document",
+            "doc_number",
+            "title",
+            "doc_status",
+            "total_amount",
+            "supplier",
+            "supplier_name",
+            "items",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id", "doc_number", "title", "doc_status", "total_amount", "supplier_name", "items", "created_at",
+        ]
+
+
+class PurchaseOrderCreateSerializer(serializers.ModelSerializer):
+    """Yangi xarid buyurtmasi yaratish (mavjud Document asosida, qatorlar bilan birga)."""
+
+    items = PurchaseOrderItemInputSerializer(many=True, required=False)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = ["document", "supplier", "items"]
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items", [])
+        purchase_order = PurchaseOrder.objects.create(**validated_data)
+        for item_data in items_data:
+            PurchaseOrderItem.objects.create(purchase_order=purchase_order, **item_data)
+        return purchase_order
+
+
+class PurchaseOrderUpdateSerializer(serializers.ModelSerializer):
+    """Xarid buyurtmasini tahrirlash: yetkazib beruvchi va (ixtiyoriy) qatorlarni almashtirish.
+
+    ``document`` bu yerda qasddan kiritilmagan - buyurtma qaysi hujjatga
+    tegishli ekanligi yaratilgandan keyin o'zgarmasligi kerak.
+    """
+
+    items = PurchaseOrderItemInputSerializer(many=True, required=False)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = ["supplier", "items"]
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop("items", None)
+        instance.supplier = validated_data.get("supplier", instance.supplier)
+        instance.save(update_fields=["supplier"])
+        if items_data is not None:
+            instance.items.all().delete()
+            for item_data in items_data:
+                PurchaseOrderItem.objects.create(purchase_order=instance, **item_data)
+        return instance
 
 
 class SupplierSerializer(serializers.ModelSerializer):

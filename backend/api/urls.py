@@ -10,7 +10,11 @@ urlpatterns = [
     path('auth/logout/', views.LogoutView.as_view(), name='logout'),
     path('auth/user/', views.UserProfileView.as_view(), name='user_profile'),
     path('auth/change-password/', views.ChangePasswordView.as_view(), name='change_password'),
-    
+
+    # Users (admin)
+    path('users/', views.UserListView.as_view(), name='user-list'),
+    path('users/<int:pk>/', views.UserDetailView.as_view(), name='user-detail'),
+
     # Dashboard
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
     path('analytics/overview/', views.AnalyticsOverviewView.as_view(), name='analytics-overview'),
@@ -28,7 +32,8 @@ urlpatterns = [
     
     # Purchase Orders
     path('purchase-orders/', views.PurchaseOrderListView.as_view(), name='purchase-order-list'),
-    
+    path('purchase-orders/<int:pk>/', views.PurchaseOrderDetailView.as_view(), name='purchase-order-detail'),
+
     # Materials
     path('materials/', views.MaterialListView.as_view(), name='material-list'),
     path('materials/<int:pk>/', views.MaterialDetailView.as_view(), name='material-detail'),

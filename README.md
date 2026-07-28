@@ -201,6 +201,16 @@ Demo loginlar:
 | GET | `/api/auth/user/` | Joriy foydalanuvchi ma'lumotlari |
 | PUT/PATCH | `/api/auth/user/` | Profilni tahrirlash |
 
+### Foydalanuvchilar (faqat admin)
+
+| Metod | Endpoint | Tavsif |
+|-------|----------|--------|
+| GET | `/api/users/` | Foydalanuvchilar ro'yxati |
+| POST | `/api/users/` | Yangi foydalanuvchi yaratish (rol va filial biriktirish bilan) |
+| GET | `/api/users/{id}/` | Foydalanuvchi tafsilotlari |
+| PUT/PATCH | `/api/users/{id}/` | Foydalanuvchini tahrirlash (parolni o'zgartirish ixtiyoriy) |
+| DELETE | `/api/users/{id}/` | Foydalanuvchini o'chirish |
+
 ### Hujjatlar
 
 | Metod | Endpoint | Tavsif |
@@ -221,6 +231,10 @@ Demo loginlar:
 | Metod | Endpoint | Tavsif |
 |-------|----------|--------|
 | GET | `/api/purchase-orders/` | Buyurtmalar ro'yxati |
+| POST | `/api/purchase-orders/` | Yangi buyurtma (mavjud hujjat asosida, qatorlar bilan birga) — procurement, admin |
+| GET | `/api/purchase-orders/{id}/` | Buyurtma tafsilotlari |
+| PUT/PATCH | `/api/purchase-orders/{id}/` | Yetkazib beruvchi/qatorlarni tahrirlash — procurement, admin |
+| DELETE | `/api/purchase-orders/{id}/` | Buyurtmani o'chirish — procurement, admin |
 
 ### Yetkazib beruvchilar
 
@@ -265,7 +279,9 @@ Demo loginlar:
 | Metod | Endpoint | Tavsif |
 |-------|----------|--------|
 | GET | `/api/contracts/` | Shartnomalar ro'yxati |
+| POST | `/api/contracts/` | Yangi shartnoma — procurement, admin |
 | GET | `/api/contracts/{id}/` | Shartnoma tafsilotlari |
+| PUT/PATCH | `/api/contracts/{id}/` | Shartnomani tahrirlash — procurement, admin |
 | GET | `/api/invoices/` | Hisob-fakturalar |
 | POST | `/api/invoices/` | Yangi hisob-faktura |
 | GET | `/api/invoices/{id}/` | Hisob-faktura tafsilotlari |
