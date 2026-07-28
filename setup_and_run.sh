@@ -149,7 +149,7 @@ run_backend() {
     sleep 3
     if is_backend_running; then
         log_ok "Backend ishga tushdi: http://localhost:${BACKEND_PORT}"
-        log_info "  DRF Swagger: http://localhost:${BACKEND_PORT}/api/schema/swagger-ui/"
+        log_info "  DRF Swagger: http://localhost:${BACKEND_PORT}/api/docs/"
         log_info "  Admin panel: http://localhost:${BACKEND_PORT}/admin/"
     else
         log_error "Backend ishga tushmadi. Log: $LOG_BACKEND"

@@ -1,6 +1,9 @@
 from decimal import Decimal
 import csv
 from io import StringIO
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Q, Sum, Count
 from django.http import HttpResponse
 from django.utils import timezone
@@ -49,18 +52,27 @@ from .serializers import (
     NotificationSerializer,
     PaymentSerializer,
     ProductionRequestSerializer,
+    PurchaseOrderCreateSerializer,
     PurchaseOrderItemSerializer,
+    PurchaseOrderSerializer,
+    PurchaseOrderUpdateSerializer,
+    StockMovementCreateSerializer,
     StockMovementSerializer,
     SupplierSerializer,
     TicketSerializer,
+    UserCreateSerializer,
     UserRegisterSerializer,
     UserSerializer,
+    UserUpdateSerializer,
     WarehouseSerializer,
 )
 
 
 ADMIN_ROLES = {"admin"}
 ARCHIVE_ROLES = {"admin", "procurement", "branch_manager"}
+STOCK_MOVEMENT_ROLES = {"admin", "warehouse"}
+PURCHASE_ORDER_ROLES = {"admin", "procurement"}
+CONTRACT_ROLES = {"admin", "procurement"}
 WORKFLOW_RULES = {
     "created": {"submit": {"next_status": "architecture", "roles": {"prorab", "procurement", "admin"}}},
     "architecture": {
@@ -160,6 +172,28 @@ def notify_branch_roles(branch, roles, title, message, notification_type="info")
         notify_users(filtered, title, message, notification_type)
 
 
+class InsufficientStockError(Exception):
+    """Omborda yetarli qoldiq bo'lmaganda ko'tariladi."""
+
+
+def lock_inventory_item(warehouse, material, create_if_missing=False):
+    """InventoryItem ni satr darajasida qulflab qaytaradi (transaction ichida chaqirilsin)."""
+    item = InventoryItem.objects.select_for_update().filter(warehouse=warehouse, material=material).first()
+    if item is None and create_if_missing:
+        InventoryItem.objects.get_or_create(warehouse=warehouse, material=material, defaults={"quantity": 0})
+        item = InventoryItem.objects.select_for_update().get(warehouse=warehouse, material=material)
+    return item
+
+
+def ensure_sufficient_stock(item, warehouse, material, quantity):
+    available = item.quantity if item else Decimal("0")
+    if available < quantity:
+        raise InsufficientStockError(
+            f"{warehouse.name} omborida {material.name} yetarli emas "
+            f"(mavjud: {available}, so'ralgan: {quantity})"
+        )
+
+
 def create_low_stock_notifications(item):
     threshold = item.min_quantity or Decimal("10")
     if item.quantity > threshold:
@@ -233,6 +267,42 @@ class LogoutView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class ChangePasswordView(APIView):
+    """Parolni o'zgartirish."""
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+
+        if not old_password or not new_password:
+            return Response(
+                {'error': "old_password va new_password majburiy"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = request.user
+        if not user.check_password(old_password):
+            return Response({'error': "Eski parol noto'g'ri"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(new_password, user)
+        except DjangoValidationError as e:
+            return Response({'new_password': list(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+
+        create_audit_log(
+            request,
+            "password_changed",
+            "User",
+            user.id,
+            {"email": user.email},
+        )
+        return Response({'message': "Parol muvaffaqiyatli o'zgartirildi"}, status=status.HTTP_200_OK)
+
+
 class UserRegisterView(generics.CreateAPIView):
     """Ro'yxatdan o'tish."""
     queryset = User.objects.all()
@@ -270,6 +340,70 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     
     def get_object(self):
         return self.request.user
+
+
+class UserListView(generics.ListCreateAPIView):
+    """Foydalanuvchilar ro'yxati va yaratish (faqat admin)."""
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = User.objects.select_related("branch").order_by("-created_at")
+
+    def get_serializer_class(self):
+        return UserCreateSerializer if self.request.method == "POST" else UserSerializer
+
+    def list(self, request, *args, **kwargs):
+        if not is_admin(request.user):
+            return Response({"error": "Bu bo'limga faqat admin kira oladi"}, status=status.HTTP_403_FORBIDDEN)
+        return super().list(request, *args, **kwargs)
+
+    def create(self, request, *args, **kwargs):
+        if not is_admin(request.user):
+            return Response({"error": "Foydalanuvchi yaratish uchun sizda ruxsat yo'q"}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        create_audit_log(request, "user_created", "User", user.id, {"email": user.email, "roles": user.roles})
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Foydalanuvchi tafsilotlari, tahrirlash va o'chirish (faqat admin)."""
+    permission_classes = (permissions.IsAuthenticated,)
+    queryset = User.objects.select_related("branch")
+
+    def get_serializer_class(self):
+        return UserUpdateSerializer if self.request.method in ("PUT", "PATCH") else UserSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        if not is_admin(request.user):
+            return Response({"error": "Bu bo'limga faqat admin kira oladi"}, status=status.HTTP_403_FORBIDDEN)
+        return super().retrieve(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        if not is_admin(request.user):
+            return Response({"error": "Foydalanuvchini tahrirlash uchun sizda ruxsat yo'q"}, status=status.HTTP_403_FORBIDDEN)
+
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        create_audit_log(request, "user_updated", "User", user.id, {"email": user.email, "roles": user.roles})
+        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        if not is_admin(request.user):
+            return Response({"error": "Foydalanuvchini o'chirish uchun sizda ruxsat yo'q"}, status=status.HTTP_403_FORBIDDEN)
+
+        instance = self.get_object()
+        if instance.id == request.user.id:
+            return Response({"error": "O'zingizni o'chira olmaysiz"}, status=status.HTTP_400_BAD_REQUEST)
+
+        create_audit_log(request, "user_deleted", "User", instance.id, {"email": instance.email})
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DashboardView(APIView):
@@ -600,33 +734,98 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 # --- Purchase Order Views ---
-class PurchaseOrderListView(generics.ListAPIView):
-    """Xarid buyurtmalari ro'yxati."""
+def _purchase_order_write_allowed(user):
+    return is_admin(user) or bool(set(user.roles or []).intersection(PURCHASE_ORDER_ROLES))
+
+
+class PurchaseOrderListView(generics.ListCreateAPIView):
+    """Xarid buyurtmalari ro'yxati va yaratish."""
     permission_classes = (permissions.IsAuthenticated,)
-    
-    def get(self, request, *args, **kwargs):
-        user = request.user
-        orders = PurchaseOrder.objects.select_related(
-            'document', 'supplier'
-        ).prefetch_related('items__material').order_by('-document__created_at')
-        
-        if user.branch:
-            orders = orders.filter(document__branch=user.branch)
-        
-        data = []
-        for order in orders:
-            data.append({
-                'id': order.id,
-                'doc_number': order.document.doc_number,
-                'title': order.document.title,
-                'status': order.document.status,
-                'total_amount': order.document.total_amount,
-                'supplier': order.supplier.name if order.supplier else None,
-                'items': PurchaseOrderItemSerializer(order.items.all(), many=True).data,
-                'created_at': order.document.created_at,
-            })
-        
-        return Response({'results': data}, status=status.HTTP_200_OK)
+
+    def get_serializer_class(self):
+        return PurchaseOrderCreateSerializer if self.request.method == "POST" else PurchaseOrderSerializer
+
+    def get_queryset(self):
+        return branch_scope(
+            PurchaseOrder.objects.select_related("document", "document__branch", "supplier")
+            .prefetch_related("items__material"),
+            self.request.user,
+            "document__branch",
+        ).order_by("-document__created_at")
+
+    def create(self, request, *args, **kwargs):
+        if not _purchase_order_write_allowed(request.user):
+            return Response(
+                {"error": "Xarid buyurtmasi yaratish uchun sizda ruxsat yo'q"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            purchase_order = serializer.save()
+
+        create_audit_log(
+            request,
+            "purchase_order_created",
+            "PurchaseOrder",
+            purchase_order.id,
+            {"document_id": purchase_order.document_id, "supplier_id": purchase_order.supplier_id},
+        )
+        return Response(PurchaseOrderSerializer(purchase_order).data, status=status.HTTP_201_CREATED)
+
+
+class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Xarid buyurtmasi tafsilotlari, tahrirlash va o'chirish."""
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_serializer_class(self):
+        return PurchaseOrderUpdateSerializer if self.request.method in ("PUT", "PATCH") else PurchaseOrderSerializer
+
+    def get_queryset(self):
+        return branch_scope(
+            PurchaseOrder.objects.select_related("document", "document__branch", "supplier")
+            .prefetch_related("items__material"),
+            self.request.user,
+            "document__branch",
+        )
+
+    def update(self, request, *args, **kwargs):
+        if not _purchase_order_write_allowed(request.user):
+            return Response(
+                {"error": "Xarid buyurtmasini tahrirlash uchun sizda ruxsat yo'q"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            purchase_order = serializer.save()
+
+        create_audit_log(
+            request,
+            "purchase_order_updated",
+            "PurchaseOrder",
+            purchase_order.id,
+            {"supplier_id": purchase_order.supplier_id},
+        )
+        return Response(PurchaseOrderSerializer(purchase_order).data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        if not _purchase_order_write_allowed(request.user):
+            return Response(
+                {"error": "Xarid buyurtmasini o'chirish uchun sizda ruxsat yo'q"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        instance = self.get_object()
+        create_audit_log(
+            request, "purchase_order_deleted", "PurchaseOrder", instance.id, {"document_id": instance.document_id}
+        )
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # --- Material Views ---
@@ -761,22 +960,115 @@ class InventoryUpdateView(APIView):
         return Response(InventoryItemSerializer(item).data, status=status.HTTP_200_OK)
 
 
-class StockMovementListView(generics.ListAPIView):
-    """Materiallar harakati tarixi."""
+class StockMovementListView(generics.ListCreateAPIView):
+    """Materiallar harakati tarixi va yangi harakat yaratish."""
 
     permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = StockMovementSerializer
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return StockMovementCreateSerializer
+        return StockMovementSerializer
 
     def get_queryset(self):
         queryset = branch_scope(
-            StockMovement.objects.select_related("warehouse", "warehouse__branch", "material", "performed_by"),
+            StockMovement.objects.select_related(
+                "warehouse", "warehouse__branch", "target_warehouse", "material", "performed_by"
+            ),
             self.request.user,
             "warehouse__branch",
         ).order_by("-performed_at")
-        return filter_by_query_params(
+        queryset = filter_by_query_params(
             queryset,
             self.request,
-            {"warehouse": "warehouse_id", "material": "material_id", "movement_type": "movement_type"},
+            {"material": "material_id", "movement_type": "movement_type"},
+        )
+        # Ombor bo'yicha filtr TRANSFER ni ikkala tomonda ham ko'rsatadi
+        warehouse = self.request.query_params.get("warehouse")
+        if warehouse:
+            queryset = queryset.filter(Q(warehouse_id=warehouse) | Q(target_warehouse_id=warehouse))
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        if not (is_admin(request.user) or bool(set(request.user.roles or []).intersection(STOCK_MOVEMENT_ROLES))):
+            return Response(
+                {"error": "Ombor harakatini yaratish uchun sizda ruxsat yo'q"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = StockMovementCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        warehouse = data["warehouse"]
+        target_warehouse = data.get("target_warehouse")
+        material = data["material"]
+        movement_type = data["movement_type"]
+        quantity = data["quantity"]
+
+        # Admin uchun cheklov yo'q; qolganlar uchun manba ham, maqsad ham o'z filialida bo'lishi shart
+        if not is_admin(request.user):
+            for candidate in (warehouse, target_warehouse):
+                if candidate and candidate.branch_id != request.user.branch_id:
+                    return Response(
+                        {"error": "Siz faqat o'z filialingiz omborlari bilan ishlashingiz mumkin"},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
+        try:
+            with transaction.atomic():
+                if movement_type == "IN":
+                    item = lock_inventory_item(warehouse, material, create_if_missing=True)
+                    item.quantity += quantity
+                    item.save(update_fields=["quantity", "updated_at"])
+                    touched_items = [item]
+                elif movement_type == "OUT":
+                    item = lock_inventory_item(warehouse, material)
+                    ensure_sufficient_stock(item, warehouse, material, quantity)
+                    item.quantity -= quantity
+                    item.save(update_fields=["quantity", "updated_at"])
+                    touched_items = [item]
+                else:
+                    # Deadlock oldini olish uchun omborlarni id bo'yicha tartib bilan qulflaymiz
+                    first, second = sorted([warehouse, target_warehouse], key=lambda w: w.id)
+                    locked = {
+                        first.id: lock_inventory_item(first, material, create_if_missing=first == target_warehouse),
+                        second.id: lock_inventory_item(second, material, create_if_missing=second == target_warehouse),
+                    }
+                    source_item = locked[warehouse.id]
+                    target_item = locked[target_warehouse.id]
+                    ensure_sufficient_stock(source_item, warehouse, material, quantity)
+
+                    source_item.quantity -= quantity
+                    source_item.save(update_fields=["quantity", "updated_at"])
+                    target_item.quantity += quantity
+                    target_item.save(update_fields=["quantity", "updated_at"])
+                    touched_items = [source_item, target_item]
+
+                movement = serializer.save(performed_by=request.user)
+        except InsufficientStockError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        for item in touched_items:
+            create_low_stock_notifications(item)
+
+        create_audit_log(
+            request,
+            "stock_movement_created",
+            "StockMovement",
+            movement.id,
+            {
+                "movement_type": movement.movement_type,
+                "warehouse_id": movement.warehouse_id,
+                "target_warehouse_id": movement.target_warehouse_id,
+                "material_id": movement.material_id,
+                "quantity": str(movement.quantity),
+                "branch_id": movement.warehouse.branch_id,
+            },
+        )
+        return Response(
+            StockMovementSerializer(movement).data,
+            status=status.HTTP_201_CREATED,
         )
 
 
@@ -1008,11 +1300,15 @@ class DocumentFileUploadView(APIView):
 
 
 # --- Contract Views ---
-class ContractListView(generics.ListAPIView):
-    """Shartnomalar ro'yxati."""
+def _contract_write_allowed(user):
+    return is_admin(user) or bool(set(user.roles or []).intersection(CONTRACT_ROLES))
+
+
+class ContractListView(generics.ListCreateAPIView):
+    """Shartnomalar ro'yxati va yaratish."""
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = ContractSerializer
-    
+
     def get_queryset(self):
         return branch_scope(
             Contract.objects.select_related("document", "supplier", "document__branch"),
@@ -1020,18 +1316,52 @@ class ContractListView(generics.ListAPIView):
             "document__branch",
         ).order_by("-document__created_at")
 
+    def create(self, request, *args, **kwargs):
+        if not _contract_write_allowed(request.user):
+            return Response(
+                {"error": "Shartnoma yaratish uchun sizda ruxsat yo'q"}, status=status.HTTP_403_FORBIDDEN
+            )
 
-class ContractDetailView(generics.RetrieveAPIView):
-    """Shartnoma tafsilotlari."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        contract = serializer.save()
+
+        create_audit_log(
+            request,
+            "contract_created",
+            "Contract",
+            contract.id,
+            {"document_id": contract.document_id, "supplier_id": contract.supplier_id},
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ContractDetailView(generics.RetrieveUpdateAPIView):
+    """Shartnoma tafsilotlari va tahrirlash."""
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = ContractSerializer
-    
+
     def get_queryset(self):
         return branch_scope(
             Contract.objects.select_related("document", "supplier", "document__branch"),
             self.request.user,
             "document__branch",
         ).order_by("-document__created_at")
+
+    def update(self, request, *args, **kwargs):
+        if not _contract_write_allowed(request.user):
+            return Response(
+                {"error": "Shartnomani tahrirlash uchun sizda ruxsat yo'q"}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        contract = serializer.save()
+
+        create_audit_log(request, "contract_updated", "Contract", contract.id, {"supplier_id": contract.supplier_id})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 # --- Invoice Views ---
