@@ -1,6 +1,8 @@
 from decimal import Decimal
 import csv
 from io import StringIO
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Q, Sum, Count
 from django.http import HttpResponse
 from django.utils import timezone
@@ -231,6 +233,42 @@ class LogoutView(APIView):
             return Response({'message': 'Muvaffaqiyatli chiqildi'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ChangePasswordView(APIView):
+    """Parolni o'zgartirish."""
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+
+        if not old_password or not new_password:
+            return Response(
+                {'error': "old_password va new_password majburiy"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = request.user
+        if not user.check_password(old_password):
+            return Response({'error': "Eski parol noto'g'ri"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(new_password, user)
+        except DjangoValidationError as e:
+            return Response({'new_password': list(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+
+        create_audit_log(
+            request,
+            "password_changed",
+            "User",
+            user.id,
+            {"email": user.email},
+        )
+        return Response({'message': "Parol muvaffaqiyatli o'zgartirildi"}, status=status.HTTP_200_OK)
 
 
 class UserRegisterView(generics.CreateAPIView):

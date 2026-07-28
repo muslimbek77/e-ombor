@@ -131,11 +131,12 @@ python manage.py migrate
 python manage.py createsuperuser
 
 # Dev serverni ishga tushirish
-python manage.py runserver
+python manage.py runserver 0.0.0.0:3000
 ```
 
 Backend `http://localhost:3000` da ishga tushadi.
-DRF Swagger hujjatlari: `http://localhost:3000/api/schema/swagger-ui/`
+DRF Swagger hujjatlari: `http://localhost:3000/api/docs/`
+OpenAPI sxemasi: `http://localhost:3000/api/schema/`
 
 ### Frontend o'rnatish
 
@@ -194,9 +195,11 @@ Demo loginlar:
 |-------|----------|--------|
 | POST | `/api/auth/register/` | Yangi foydalanuvchi ro'yxatdan o'tkazish |
 | POST | `/api/auth/login/` | Kirish (access + refresh token) |
-| POST | `/api/auth/login/refresh/` | Token yangilash |
+| POST | `/api/auth/refresh/` | Token yangilash |
+| POST | `/api/auth/logout/` | Chiqish (refresh tokenni blacklist qilish) |
 | POST | `/api/auth/change-password/` | Parolni o'zgartirish |
 | GET | `/api/auth/user/` | Joriy foydalanuvchi ma'lumotlari |
+| PUT/PATCH | `/api/auth/user/` | Profilni tahrirlash |
 
 ### Hujjatlar
 
@@ -204,39 +207,57 @@ Demo loginlar:
 |-------|----------|--------|
 | GET | `/api/documents/` | Hujjatlar ro'yxati |
 | POST | `/api/documents/` | Yangi hujjat yaratish |
+| GET | `/api/documents/export/` | Hujjatlarni CSV formatida yuklab olish |
 | GET | `/api/documents/{id}/` | Hujjat tafsilotlari |
-| GET | `/api/documents/{id}/files/` | Fayllar ro'yxati |
+| PUT/PATCH | `/api/documents/{id}/` | Hujjatni tahrirlash |
+| DELETE | `/api/documents/{id}/` | Hujjatni o'chirish |
+| POST | `/api/documents/{id}/workflow/` | Workflow amali (submit/approve/reject/...) |
+| POST | `/api/documents/{id}/archive/` | Arxivlash / arxivdan chiqarish |
 | POST | `/api/documents/{id}/files/` | Fayl yuklash |
+| GET | `/api/documents/{id}/files/list/` | Fayllar ro'yxati |
 
 ### Xarid buyurtmalari
 
 | Metod | Endpoint | Tavsif |
 |-------|----------|--------|
 | GET | `/api/purchase-orders/` | Buyurtmalar ro'yxati |
-| POST | `/api/purchase-orders/` | Yangi buyurtma |
-| GET | `/api/purchase-orders/{id}/` | Buyurtma tafsilotlari |
 
 ### Yetkazib beruvchilar
 
 | Metod | Endpoint | Tavsif |
 |-------|----------|--------|
 | GET | `/api/suppliers/` | Yetkazib beruvchilar ro'yxati |
+| POST | `/api/suppliers/` | Yangi yetkazib beruvchi |
 | GET | `/api/suppliers/{id}/` | Yetkazib beruvchi tafsilotlari |
+| PUT/PATCH | `/api/suppliers/{id}/` | Yetkazib beruvchini tahrirlash |
+| DELETE | `/api/suppliers/{id}/` | Yetkazib beruvchini o'chirish |
 
 ### Ombor va Materiallar
 
 | Metod | Endpoint | Tavsif |
 |-------|----------|--------|
 | GET | `/api/materials/` | Materiallar ro'yxati |
+| POST | `/api/materials/` | Yangi material |
+| GET/PUT/PATCH/DELETE | `/api/materials/{id}/` | Material tafsilotlari va tahrirlash |
 | GET | `/api/warehouses/` | Omborxonalar ro'yxati |
-| GET | `/api/inventory-items/` | Inventarizatsiya holati |
+| POST | `/api/warehouses/` | Yangi omborxona |
+| GET/PUT/PATCH/DELETE | `/api/warehouses/{id}/` | Omborxona tafsilotlari va tahrirlash |
+| GET | `/api/inventory/` | Inventarizatsiya holati |
+| POST | `/api/inventory/` | Inventar yozuvini yaratish |
+| GET | `/api/inventory/export/` | Inventarizatsiyani CSV formatida yuklab olish |
+| PATCH | `/api/inventory/{id}/` | Qoldiqni korrektirovka qilish |
+| GET | `/api/stock-movements/` | Ombor harakatlari tarixi |
 
 ### Tashkilot
 
 | Metod | Endpoint | Tavsif |
 |-------|----------|--------|
 | GET | `/api/branches/` | Sho'ba bo'limlar |
-| GET | `/api/construction-sites/` | Qurilish maydonchalari |
+| POST | `/api/branches/` | Yangi sho'ba bo'lim |
+| GET/PUT/PATCH/DELETE | `/api/branches/{id}/` | Sho'ba bo'lim tafsilotlari va tahrirlash |
+| GET | `/api/sites/` | Qurilish maydonchalari |
+| POST | `/api/sites/` | Yangi qurilish maydonchasi |
+| GET/PUT/PATCH/DELETE | `/api/sites/{id}/` | Maydoncha tafsilotlari va tahrirlash |
 
 ### Moliya
 
@@ -247,6 +268,7 @@ Demo loginlar:
 | GET | `/api/invoices/` | Hisob-fakturalar |
 | POST | `/api/invoices/` | Yangi hisob-faktura |
 | GET | `/api/invoices/{id}/` | Hisob-faktura tafsilotlari |
+| PUT/PATCH | `/api/invoices/{id}/` | Hisob-fakturani tahrirlash |
 | GET | `/api/payments/` | To'lovlar ro'yxati |
 | POST | `/api/invoices/{id}/payments/` | To'lov qilish |
 
@@ -257,6 +279,7 @@ Demo loginlar:
 | GET | `/api/production-requests/` | Zayavkalar ro'yxati |
 | POST | `/api/production-requests/` | Yangi zayavka |
 | GET | `/api/production-requests/{id}/` | Zayavka tafsilotlari |
+| PUT/PATCH | `/api/production-requests/{id}/` | Zayavkani tahrirlash |
 
 ### Murojaatlar (Ticket)
 
@@ -264,7 +287,9 @@ Demo loginlar:
 |-------|----------|--------|
 | GET | `/api/tickets/` | Murojaatlar ro'yxati |
 | POST | `/api/tickets/` | Yangi murojaat |
+| GET | `/api/tickets/export/` | Murojaatlarni CSV formatida yuklab olish |
 | GET | `/api/tickets/{id}/` | Murojaat tafsilotlari |
+| PUT/PATCH | `/api/tickets/{id}/` | Murojaatni tahrirlash |
 
 ### Manzillar
 
@@ -281,9 +306,11 @@ Demo loginlar:
 | Metod | Endpoint | Tavsif |
 |-------|----------|--------|
 | GET | `/api/dashboard/` | Umumiy statistika |
+| GET | `/api/analytics/overview/` | Analitik ko'rsatkichlar |
 | GET | `/api/notifications/` | Bildirishnomalar ro'yxati |
 | POST | `/api/notifications/{id}/read/` | O'qilgan deb belgilash |
 | POST | `/api/notifications/read-all/` | Hammasini o'qilgan deb belgilash |
+| GET | `/api/audit-logs/` | Audit loglari |
 
 ---
 
