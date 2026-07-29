@@ -23,9 +23,7 @@ O'zbekiston davlat xizmatlari va tashkilotlar uchun mo'ljallangan birlashtirilga
 └──────────────────────────┬──────────────────────────────────┘
                            │ HTTP/REST
 ┌──────────────────────────▼──────────────────────────────────┐
-│                    React + Vite (Frontend)                   │
-│  - SPA ilova (react-router-dom)                              │
-│  - Axios orqali API bilan muloqot                            │
+│                    Frontend (alohida repo)                    │
 └──────────────────────────┬──────────────────────────────────┘
                            │ REST API
 ┌──────────────────────────▼──────────────────────────────────┐
@@ -109,7 +107,6 @@ O'zbekiston davlat xizmatlari va tashkilotlar uchun mo'ljallangan birlashtirilga
 
 ### Talablar
 - Python 3.9+
-- Node.js 16+
 - (ixtiyoriy) PostgreSQL 14+
 
 ### Backend o'rnatish
@@ -137,20 +134,6 @@ python manage.py runserver 0.0.0.0:3000
 Backend `http://localhost:3000` da ishga tushadi.
 DRF Swagger hujjatlari: `http://localhost:3000/api/docs/`
 OpenAPI sxemasi: `http://localhost:3000/api/schema/`
-
-### Frontend o'rnatish
-
-```bash
-cd frontend
-
-# Bog'liqliklarni o'rnatish
-npm install
-
-# Dev serverni ishga tushirish
-npm run dev
-```
-
-Frontend `http://localhost:5173` da ishga tushadi.
 
 ### Backend .env sozlamalari
 
@@ -392,14 +375,6 @@ e-ombor/
 │   ├── .env                    # Maxfiy sozlamalar (gitignore'da)
 │   ├── db.sqlite3              # Ma'lumotlar bazasi
 │   └── venv/                   # Virtual muhit
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── pages/              # Sahifalar
-│   ├── package.json
-│   ├── vite.config.js
-│   └── index.html
 └── README.md
 ```
 

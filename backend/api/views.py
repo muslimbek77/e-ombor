@@ -4,7 +4,7 @@ from io import StringIO
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Q, Sum, Count
+from django.db.models import F, Q, Sum, Count
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import generics, permissions, serializers, status
@@ -445,7 +445,7 @@ class DashboardView(APIView):
             "total_warehouses": warehouses.count(),
             "total_sites": sites.count(),
             "low_stock_items": inventory.filter(
-                Q(quantity__lte=Q(min_quantity)) | Q(min_quantity=0, quantity__lte=10)
+                Q(quantity__lte=F("min_quantity")) | Q(min_quantity=0, quantity__lte=10)
             ).count(),
             "recent_documents": DocumentSerializer(documents.order_by("-created_at")[:5], many=True).data,
             "recent_tickets": TicketSerializer(tickets.order_by("-created_at")[:5], many=True).data,
@@ -491,7 +491,7 @@ class AnalyticsOverviewView(APIView):
         audit_logs = scoped_audit_logs(user)
 
         overdue_invoices = invoices.filter(payment_status__in=["unpaid", "partial"], due_date__lt=timezone.localdate())
-        low_stock_items = inventory.filter(Q(quantity__lte=Q(min_quantity)) | Q(min_quantity=0, quantity__lte=10))
+        low_stock_items = inventory.filter(Q(quantity__lte=F("min_quantity")) | Q(min_quantity=0, quantity__lte=10))
 
         data = {
             "documents_by_type": list(documents.values("doc_type").annotate(total=Count("id")).order_by("doc_type")),

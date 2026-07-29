@@ -1,15 +1,13 @@
 #!/bin/bash
 
 # ============================================================
-# E-Ombor Platform — To'liq ishga tushirish skripti
+# E-Ombor Backend — Ishga tushirish skripti
 # ============================================================
 # Foydalanish:
 #   chmod +x setup_and_run.sh
 #   ./setup_and_run.sh
 #
-# Yoki faqat backend/frontend:
 #   ./setup_and_run.sh backend
-#   ./setup_and_run.sh frontend
 #   ./setup_and_run.sh stop
 #   ./setup_and_run.sh status
 # ============================================================
@@ -29,11 +27,8 @@ INFO='\033[0;36m[i]\033[0m'
 # --- O'zgaruvchilar ---
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$PROJECT_DIR/backend"
-FRONTEND_DIR="$PROJECT_DIR/frontend"
 PID_FILE_BACKEND="$PROJECT_DIR/.pids/backend.pid"
-PID_FILE_FRONTEND="$PROJECT_DIR/.pids/frontend.pid"
 LOG_BACKEND="$PROJECT_DIR/logs/backend.log"
-LOG_FRONTEND="$PROJECT_DIR/logs/frontend.log"
 BACKEND_PORT=3000
 BACKEND_PYTHON="$BACKEND_DIR/venv/bin/python"
 BACKEND_PIP="$BACKEND_DIR/venv/bin/pip"
@@ -158,59 +153,6 @@ run_backend() {
 }
 
 # ============================================================
-# FRONTEND — O'rnatish va ishga tushirish
-# ============================================================
-
-setup_frontend() {
-    echo ""
-    echo -e "${CYAN}════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  ⚙️  Frontend tayyorlash bosqichi${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════${NC}"
-    echo ""
-
-    cd "$FRONTEND_DIR"
-
-    # Node.js tekshirish
-    check_command node || return 1
-    check_command npm || return 1
-
-    # Bog'liqliklarni o'rnatish
-    if [ -d "node_modules" ]; then
-        log_ok "node_modules allaqachon mavjud."
-    else
-        log_info "Bog'liqliklar o'rnatilmoqda..."
-        npm install
-        log_ok "Bog'liqliklar o'rnatildi."
-    fi
-
-    log_ok "Frontend tayyor."
-}
-
-run_frontend() {
-    ensure_dirs
-
-    if is_frontend_running; then
-        log_warn "Frontend allaqachon ishlayapti (PID: $(cat "$PID_FILE_FRONTEND"))."
-        return 0
-    fi
-
-    cd "$FRONTEND_DIR"
-
-    log_info "Frontend ishga tushirilmoqda... http://localhost:5173"
-    npm run dev >> "$LOG_FRONTEND" 2>&1 &
-    echo $! > "$PID_FILE_FRONTEND"
-
-    # Server tayyorligini kutish
-    sleep 4
-    if is_frontend_running; then
-        log_ok "Frontend ishga tushdi: http://localhost:5173"
-    else
-        log_error "Frontend ishga tushmadi. Log: $LOG_FRONTEND"
-        return 1
-    fi
-}
-
-# ============================================================
 # TO'XTATISH VA HOLAT
 # ============================================================
 
@@ -226,29 +168,10 @@ stop_backend() {
     fi
 }
 
-stop_frontend() {
-    if is_frontend_running; then
-        local pid=$(cat "$PID_FILE_FRONTEND")
-        log_info "Frontend to'xtatilmoqda (PID: $pid)..."
-        kill "$pid" 2>/dev/null || true
-        rm -f "$PID_FILE_FRONTEND"
-        log_ok "Frontend to'xtatildi."
-    else
-        log_warn "Frontend ishlamayapti."
-    fi
-}
-
-stop_all() {
-    log_info "Barcha xizmatlar to'xtatilmoqda..."
-    stop_backend
-    stop_frontend
-    log_ok "Barcha xizmatlar to'xtatildi."
-}
-
 status_all() {
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  📊 E-Ombor — Holat${NC}"
+    echo -e "${CYAN}  📊 E-Ombor Backend — Holat${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════${NC}"
     echo ""
 
@@ -256,12 +179,6 @@ status_all() {
         log_ok "Backend:  Ishlayapti (PID: $(cat "$PID_FILE_BACKEND")) — http://localhost:${BACKEND_PORT}"
     else
         log_error "Backend:  Ishlamayapti"
-    fi
-
-    if is_frontend_running; then
-        log_ok "Frontend: Ishlayapti (PID: $(cat "$PID_FILE_FRONTEND")) — http://localhost:5173"
-    else
-        log_error "Frontend: Ishlamayapti"
     fi
     echo ""
 }
@@ -274,58 +191,41 @@ is_backend_running() {
     [ -f "$PID_FILE_BACKEND" ] && kill -0 "$(cat "$PID_FILE_BACKEND")" 2>/dev/null
 }
 
-is_frontend_running() {
-    [ -f "$PID_FILE_FRONTEND" ] && kill -0 "$(cat "$PID_FILE_FRONTEND")" 2>/dev/null
-}
-
 # ============================================================
 # ASOSIY MANTIQ
 # ============================================================
 
 print_usage() {
     echo ""
-    echo -e "${CYAN}E-Ombor Platform — Boshqaruv skripti${NC}"
+    echo -e "${CYAN}E-Ombor Backend — Boshqaruv skripti${NC}"
     echo ""
     echo "  Foydalanish: $0 [buyruq]"
     echo ""
     echo "  Buyruqlar:"
-    echo "    setup     — Backend va frontend tayyorlash (o'rnatish)"
-    echo "    run       — Backend va frontend ishga tushirish"
+    echo "    setup     — Backend tayyorlash (o'rnatish)"
+    echo "    run       — Backend ishga tushirish"
     echo "    all       — Setup + Run (hammasi birga)"
-    echo "    backend   — Faqat backend (setup + run)"
-    echo "    frontend  — Faqat frontend (setup + run)"
-    echo "    stop      — Barcha xizmatlarni to'xtatish"
+    echo "    backend   — Setup + Run (setup dan alias)"
+    echo "    stop      — Backendni to'xtatish"
     echo "    status    — Holatni ko'rsatish"
     echo "    logs      — Loglarni ko'rsatish"
-    echo "    clean     — Virtual muhit va node_modulesni o'chirish"
+    echo "    clean     — Virtual muhitni o'chirish"
     echo ""
 }
 
 case "${1}" in
     setup)
         setup_backend
-        setup_frontend
         ;;
     run)
         run_backend
-        run_frontend
         ;;
-    all)
-        setup_backend
-        setup_frontend
-        run_backend
-        run_frontend
-        ;;
-    backend)
+    all|backend)
         setup_backend
         run_backend
-        ;;
-    frontend)
-        setup_frontend
-        run_frontend
         ;;
     stop)
-        stop_all
+        stop_backend
         ;;
     status)
         status_all
@@ -335,15 +235,11 @@ case "${1}" in
         echo -e "${CYAN}--- Backend log (oxirgi 30 qator) ---${NC}"
         tail -n 30 "$LOG_BACKEND" 2>/dev/null || echo "Log topilmadi."
         echo ""
-        echo -e "${CYAN}--- Frontend log (oxirgi 30 qator) ---${NC}"
-        tail -n 30 "$LOG_FRONTEND" 2>/dev/null || echo "Log topilmadi."
-        echo ""
         ;;
     clean)
         log_info "Tozalash boshlandi..."
         rm -rf "$BACKEND_DIR/venv"
         rm -f "$BACKEND_DIR/db.sqlite3"
-        rm -rf "$FRONTEND_DIR/node_modules"
         rm -rf "$PROJECT_DIR/.pids"
         rm -rf "$PROJECT_DIR/logs"
         log_ok "Tozalash tugallandi."
