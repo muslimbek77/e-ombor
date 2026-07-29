@@ -33,6 +33,8 @@ import ProductionRequestsPage from "../pages/production-requests/ProductionReque
 import ProductionRequestDetailPage from "../pages/production-requests/ProductionRequestDetailPage";
 import AuditLogsPage from "../pages/audit-logs/AuditLogsPage";
 import SettingsPage from "../pages/settings/SettingsPage";
+import AddressesPage from "../pages/addresses/AddressesPage";
+import AddressDetailPage from "../pages/addresses/AddressDetailPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -169,6 +171,14 @@ const router = createBrowserRouter([
       {
         path: "/audit-logs",
         element: <AuditLogsPage />,
+      },
+      {
+        path: "/addresses",
+        element: <AddressesPage />,
+      },
+      {
+        path: "/addresses/:id",
+        element: <AddressDetailPage />,
       },
 
       {

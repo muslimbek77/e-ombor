@@ -16,6 +16,7 @@ import {
   UserCog,
   Settings,
   History,
+  MapPin,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
@@ -61,6 +62,11 @@ const ASOSIY: NavItem[] = [
     label: "Supplierlar",
     icon: <Users size={18} />,
     href: "/suppliers",
+  },
+  {
+    label: "Manzillar",
+    icon: <MapPin size={18} />,
+    href: "/addresses",
   },
   {
     label: "Ombor",
