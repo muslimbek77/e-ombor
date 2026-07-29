@@ -25,6 +25,8 @@ import InvoicesPage from "../pages/invoices/InvoicesPage";
 import InvoiceDetailPage from "../pages/invoices/InvoiceDetailPage";
 import UsersPage from "../pages/users/UsersPage";
 import UserDetailPage from "../pages/users/UserDetailPage";
+import DocumentsPage from "../pages/documents/DocumentsPage";
+import DocumentDetailPage from "../pages/documents/DocumentDetailPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -133,6 +135,14 @@ const router = createBrowserRouter([
       {
         path: "/users/:id",
         element: <UserDetailPage />,
+      },
+      {
+        path: "/documents",
+        element: <DocumentsPage />,
+      },
+      {
+        path: "/documents/:id",
+        element: <DocumentDetailPage />,
       },
 
       {
