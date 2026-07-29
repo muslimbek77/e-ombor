@@ -35,6 +35,7 @@ import AuditLogsPage from "../pages/audit-logs/AuditLogsPage";
 import SettingsPage from "../pages/settings/SettingsPage";
 import AddressesPage from "../pages/addresses/AddressesPage";
 import AddressDetailPage from "../pages/addresses/AddressDetailPage";
+import ReportsPage from "../pages/reports/ReportsPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -179,6 +180,10 @@ const router = createBrowserRouter([
       {
         path: "/addresses/:id",
         element: <AddressDetailPage />,
+      },
+      {
+        path: "/reports",
+        element: <ReportsPage />,
       },
 
       {

@@ -10,6 +10,7 @@ import {
   Layers,
   Calculator,
   FolderOpen,
+  BarChart2,
   ClipboardList,
   MessageSquare,
   Bell,
@@ -97,6 +98,11 @@ const ASOSIY: NavItem[] = [
     label: "Zayavkalar",
     icon: <ClipboardList size={18} />,
     href: "/production-requests",
+  },
+  {
+    label: "Hisobotlar",
+    icon: <BarChart2 size={18} />,
+    href: "/reports",
   },
   {
     label: "Murojaatlar",
