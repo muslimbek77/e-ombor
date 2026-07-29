@@ -14,6 +14,8 @@ import WarehousesPage from "../pages/warehouses/WarehousesPage";
 import WarehouseDetailPage from "../pages/warehouses/WarehouseDetailPage";
 import ShartnomalarPage from "../pages/shartnomalar/ShartnomalarPage";
 import ShartnomaDetailPage from "../pages/shartnomalar/ShartnomaDetailPage";
+import InventoryPage from "../pages/inventory/InventoryPage";
+import InventoryDetailPage from "../pages/inventory/InventoryDetailPage";
 import MaterialsPage from "../pages/materials/MaterialsPage";
 import MaterialDetailPage from "../pages/materials/MaterialDetailPage";
 import NotificationsPage from "../pages/notifications/NotificationsPage";
@@ -83,6 +85,14 @@ const router = createBrowserRouter([
       {
         path: "/warehouse/:id",
         element: <WarehouseDetailPage />,
+      },
+      {
+        path: "/inventory",
+        element: <InventoryPage />,
+      },
+      {
+        path: "/inventory/:id",
+        element: <InventoryDetailPage />,
       },
       {
         path: "/contracts",

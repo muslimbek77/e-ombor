@@ -6,6 +6,7 @@ import {
   FileText,
   Users,
   Package,
+  Boxes,
   Layers,
   Calculator,
   FolderOpen,
@@ -64,6 +65,11 @@ const ASOSIY: NavItem[] = [
     label: "Ombor",
     icon: <Package size={18} />,
     href: "/warehouse",
+  },
+  {
+    label: "Inventar",
+    icon: <Boxes size={18} />,
+    href: "/inventory",
   },
   {
     label: "Materiallar",
