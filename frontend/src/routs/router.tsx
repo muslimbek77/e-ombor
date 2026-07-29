@@ -31,6 +31,8 @@ import DocumentsPage from "../pages/documents/DocumentsPage";
 import DocumentDetailPage from "../pages/documents/DocumentDetailPage";
 import ProductionRequestsPage from "../pages/production-requests/ProductionRequestsPage";
 import ProductionRequestDetailPage from "../pages/production-requests/ProductionRequestDetailPage";
+import AuditLogsPage from "../pages/audit-logs/AuditLogsPage";
+import SettingsPage from "../pages/settings/SettingsPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -62,7 +64,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/settings",
-        element: <div>Settings Page</div>,
+        element: <SettingsPage />,
       },
       {
         path: "/objects",
@@ -163,6 +165,10 @@ const router = createBrowserRouter([
       {
         path: "/production-requests/:id",
         element: <ProductionRequestDetailPage />,
+      },
+      {
+        path: "/audit-logs",
+        element: <AuditLogsPage />,
       },
 
       {

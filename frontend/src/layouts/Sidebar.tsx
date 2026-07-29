@@ -10,12 +10,12 @@ import {
   Layers,
   Calculator,
   FolderOpen,
-  BarChart2,
   ClipboardList,
   MessageSquare,
   Bell,
   UserCog,
   Settings,
+  History,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
@@ -93,11 +93,6 @@ const ASOSIY: NavItem[] = [
     href: "/production-requests",
   },
   {
-    label: "Hisobotlar",
-    icon: <BarChart2 size={18} />,
-    href: "/reports",
-  },
-  {
     label: "Murojaatlar",
     icon: <MessageSquare size={18} />,
     href: "/tickets",
@@ -111,6 +106,11 @@ const ASOSIY: NavItem[] = [
     label: "Foydalanuvchilar",
     icon: <UserCog size={18} />,
     href: "/users",
+  },
+  {
+    label: "Audit jurnali",
+    icon: <History size={18} />,
+    href: "/audit-logs",
   },
   {
     label: "Sozlamalar",
