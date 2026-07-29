@@ -29,6 +29,8 @@ import UsersPage from "../pages/users/UsersPage";
 import UserDetailPage from "../pages/users/UserDetailPage";
 import DocumentsPage from "../pages/documents/DocumentsPage";
 import DocumentDetailPage from "../pages/documents/DocumentDetailPage";
+import ProductionRequestsPage from "../pages/production-requests/ProductionRequestsPage";
+import ProductionRequestDetailPage from "../pages/production-requests/ProductionRequestDetailPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -153,6 +155,14 @@ const router = createBrowserRouter([
       {
         path: "/documents/:id",
         element: <DocumentDetailPage />,
+      },
+      {
+        path: "/production-requests",
+        element: <ProductionRequestsPage />,
+      },
+      {
+        path: "/production-requests/:id",
+        element: <ProductionRequestDetailPage />,
       },
 
       {
