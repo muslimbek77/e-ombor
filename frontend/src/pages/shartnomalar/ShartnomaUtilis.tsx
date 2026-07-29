@@ -1,11 +1,13 @@
-export function isExpiringSoon(endDate: string): boolean {
+export function isExpiringSoon(endDate: string | null): boolean {
+  if (!endDate) return false;
   const end = new Date(endDate).getTime();
   const now = Date.now();
   const daysLeft = (end - now) / (1000 * 60 * 60 * 24);
   return daysLeft > 0 && daysLeft <= 60;
 }
 
-export function isExpired(endDate: string): boolean {
+export function isExpired(endDate: string | null): boolean {
+  if (!endDate) return false;
   return new Date(endDate).getTime() < Date.now();
 }
 
