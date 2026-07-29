@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   adjustInventoryItem,
   createInventoryItem,
+  exportInventory,
   getInventory,
   inventoryQueryKey,
 } from "../api/inventory";
 import { stockMovementsQueryKey } from "../api/stockMovements";
 import type { InventoryFilters } from "../api/inventory";
+import { downloadBlob } from "../lib/downloadFile";
 
 export function useInventory(filters?: InventoryFilters) {
   return useQuery({
@@ -44,5 +46,12 @@ export function useAdjustInventoryItem() {
       queryClient.invalidateQueries({ queryKey: inventoryQueryKey });
       queryClient.invalidateQueries({ queryKey: stockMovementsQueryKey });
     },
+  });
+}
+
+export function useExportInventory() {
+  return useMutation({
+    mutationFn: exportInventory,
+    onSuccess: (blob) => downloadBlob(blob, "inventar.csv"),
   });
 }

@@ -1,6 +1,6 @@
-import { Archive, Plus, Search, X } from "lucide-react";
+import { Archive, Download, Plus, Search, X } from "lucide-react";
 import { useDeferredValue, useMemo, useState } from "react";
-import { useCreateDocument, useDocuments } from "../../hooks/useDocuments";
+import { useCreateDocument, useDocuments, useExportDocuments } from "../../hooks/useDocuments";
 import { DocumentCard } from "./DocumentCard";
 import { DocumentForm } from "./DocumentForm";
 import { STATUS_FILTERS } from "./documentUtils";
@@ -16,6 +16,7 @@ export default function DocumentsPage() {
   const deferredQuery = useDeferredValue(query);
   const { data: documents = [], isPending, isError } = useDocuments({ archived: showArchived ? "true" : "false" });
   const createDocument = useCreateDocument();
+  const exportDocuments = useExportDocuments();
 
   const filteredDocuments = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase();
@@ -46,6 +47,14 @@ export default function DocumentsPage() {
             >
               <Archive size={15} /> {showArchived ? "Arxivlanganlar" : "Faol hujjatlar"}
             </button>
+            <button
+              type="button"
+              onClick={() => exportDocuments.mutate({ status: statusFilter === "all" ? undefined : statusFilter, archived: showArchived ? "true" : "false" })}
+              disabled={exportDocuments.isPending}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download size={15} /> {exportDocuments.isPending ? "Yuklab olinmoqda..." : "Eksport"}
+            </button>
             <label className="relative">
               <span className="sr-only">Hujjatlarni qidirish</span>
               <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />
@@ -53,6 +62,8 @@ export default function DocumentsPage() {
             </label>
           </div>
         </header>
+
+        {exportDocuments.isError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">Hujjatlarni eksport qilib bo'lmadi.</p>}
 
         <div className="flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white p-1">
           {STATUS_FILTERS.map((filter) => (

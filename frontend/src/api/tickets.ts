@@ -23,3 +23,14 @@ export async function updateTicket({ ticketId, payload }: { ticketId: number; pa
   const { data } = await api.put<Ticket>(`/tickets/${ticketId}/`, payload);
   return data;
 }
+
+export interface TicketFilters {
+  status?: string;
+  priority?: string;
+  category?: string;
+}
+
+export async function exportTickets(filters?: TicketFilters): Promise<Blob> {
+  const { data } = await api.get<Blob>("/tickets/export/", { params: filters, responseType: "blob" });
+  return data;
+}

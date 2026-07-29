@@ -34,3 +34,8 @@ export async function adjustInventoryItem({
   const { data } = await api.patch<InventoryItem>(`/inventory/${itemId}/`, payload);
   return data;
 }
+
+export async function exportInventory(filters?: InventoryFilters): Promise<Blob> {
+  const { data } = await api.get<Blob>("/inventory/export/", { params: filters, responseType: "blob" });
+  return data;
+}

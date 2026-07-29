@@ -4,6 +4,7 @@ import {
   documentFilesQueryKey,
   documentQueryKey,
   documentsQueryKey,
+  exportDocuments,
   getDocument,
   getDocumentFiles,
   getDocuments,
@@ -13,6 +14,7 @@ import {
   uploadDocumentFile,
 } from "../api/documents";
 import type { DocumentFilters } from "../api/documents";
+import { downloadBlob } from "../lib/downloadFile";
 
 export function useDocuments(filters?: DocumentFilters) {
   return useQuery({
@@ -85,5 +87,12 @@ export function useUploadDocumentFile() {
   return useMutation({
     mutationFn: uploadDocumentFile,
     onSuccess: (_, variables) => queryClient.invalidateQueries({ queryKey: documentFilesQueryKey(variables.documentId) }),
+  });
+}
+
+export function useExportDocuments() {
+  return useMutation({
+    mutationFn: exportDocuments,
+    onSuccess: (blob) => downloadBlob(blob, "hujjatlar.csv"),
   });
 }

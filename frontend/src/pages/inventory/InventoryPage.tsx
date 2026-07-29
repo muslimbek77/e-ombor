@@ -1,6 +1,6 @@
-import { AlertTriangle, Plus, Search, X } from "lucide-react";
+import { AlertTriangle, Download, Plus, Search, X } from "lucide-react";
 import { useDeferredValue, useMemo, useState } from "react";
-import { useCreateInventoryItem, useInventory } from "../../hooks/useInventory";
+import { useCreateInventoryItem, useExportInventory, useInventory } from "../../hooks/useInventory";
 import { useWarehouses } from "../../hooks/useWarehouses";
 import { InventoryCard } from "./InventoryCard";
 import { InventoryForm } from "./InventoryForm";
@@ -16,6 +16,7 @@ export default function InventoryPage() {
   const { data: warehouses = [] } = useWarehouses();
   const { data: items = [], isPending, isError } = useInventory(warehouseFilter ? { warehouse: Number(warehouseFilter) } : undefined);
   const createInventoryItem = useCreateInventoryItem();
+  const exportInventory = useExportInventory();
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase();
@@ -55,8 +56,18 @@ export default function InventoryPage() {
             >
               <AlertTriangle size={14} /> Kam qoldiqlar
             </button>
+            <button
+              type="button"
+              onClick={() => exportInventory.mutate(warehouseFilter ? { warehouse: Number(warehouseFilter) } : undefined)}
+              disabled={exportInventory.isPending}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download size={15} /> {exportInventory.isPending ? "Yuklab olinmoqda..." : "Eksport"}
+            </button>
           </div>
         </header>
+
+        {exportInventory.isError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">Inventarni eksport qilib bo'lmadi.</p>}
 
         {isPending && <PageState>Yuklanmoqda...</PageState>}
         {isError && <PageState className="text-red-500">Inventarni yuklashda xatolik yuz berdi</PageState>}

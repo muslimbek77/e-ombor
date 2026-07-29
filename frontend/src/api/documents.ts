@@ -59,3 +59,8 @@ export async function uploadDocumentFile({ documentId, file }: { documentId: num
   formData.append("file", file);
   await api.post(`/documents/${documentId}/files/`, formData, { headers: { "Content-Type": "multipart/form-data" } });
 }
+
+export async function exportDocuments(filters?: Pick<DocumentFilters, "doc_type" | "status" | "archived">): Promise<Blob> {
+  const { data } = await api.get<Blob>("/documents/export/", { params: filters, responseType: "blob" });
+  return data;
+}
