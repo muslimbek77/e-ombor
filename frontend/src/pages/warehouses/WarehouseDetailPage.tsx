@@ -1,0 +1,19 @@
+import { ArrowLeft, BellRing, Building2, Calendar, MapPin, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useDeleteWarehouse, useUpdateWarehouse, useWarehouse } from "../../hooks/useWarehouses";
+import { formatDate } from "../objects/siteUtils";
+import { WarehouseForm } from "./WarehouseForm";
+
+export default function WarehouseDetailPage() {
+  const { id } = useParams(); const warehouseId = Number(id); const navigate = useNavigate(); const [isEditing, setIsEditing] = useState(false);
+  const { data: warehouse, isPending, isError } = useWarehouse(warehouseId); const updateWarehouse = useUpdateWarehouse(); const deleteWarehouse = useDeleteWarehouse();
+  if (!Number.isInteger(warehouseId) || warehouseId < 1) return <DetailState>Ombor ID noto‘g‘ri.</DetailState>;
+  if (isPending) return <DetailState>Yuklanmoqda...</DetailState>;
+  if (isError || !warehouse) return <DetailState>Omborni yuklashda xatolik yuz berdi.</DetailState>;
+  function handleDelete() { if (!window.confirm(`“${warehouse.name}” omborini o‘chirmoqchimisiz?`)) return; deleteWarehouse.mutate(warehouse.id, { onSuccess: () => navigate("/warehouse", { replace: true }) }); }
+  const details = [[<Building2 size={17} />, "Filial", warehouse.branch_name], [<MapPin size={17} />, "Manzil", warehouse.address], [<BellRing size={17} />, "Minimal zaxira ogohlantirishi", warehouse.min_stock_alert ? "Faol" : "O‘chiq"], [<Calendar size={17} />, "Yaratilgan sana", formatDate(warehouse.created_at)]];
+  return <main className="min-h-full bg-gray-50 p-6"><div className="mx-auto max-w-4xl space-y-5"><Link to="/warehouse" className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-green-700"><ArrowLeft size={16} /> Omborlarga qaytish</Link><section className="rounded-2xl bg-white p-6 shadow-sm"><div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold text-gray-900">{warehouse.name}</h1><p className="mt-1 text-sm text-gray-500">Kod: {warehouse.code}</p></div><div className="flex items-center gap-2"><button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"><Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}</button><button type="button" onClick={handleDelete} disabled={deleteWarehouse.isPending} className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"><Trash2 size={15} /> O‘chirish</button></div></div>{deleteWarehouse.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">Omborni o‘chirib bo‘lmadi.</p>}{isEditing ? <><h2 className="mb-4 text-lg font-bold text-gray-900">Omborni tahrirlash</h2>{updateWarehouse.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">O‘zgarishlarni saqlab bo‘lmadi.</p>}<WarehouseForm key={warehouse.id} initialWarehouse={warehouse} submitLabel="Saqlash" isSubmitting={updateWarehouse.isPending} onCancel={() => setIsEditing(false)} onSubmit={(payload) => updateWarehouse.mutate({ warehouseId: warehouse.id, payload }, { onSuccess: () => setIsEditing(false) })} /></> : <dl className="grid gap-4 sm:grid-cols-2">{details.map(([icon, label, value]) => <div key={String(label)} className="flex gap-3 rounded-xl bg-gray-50 p-4"><span className="mt-0.5 text-gray-400">{icon}</span><div><dt className="text-xs font-medium text-gray-500">{label}</dt><dd className="mt-1 text-sm font-semibold text-gray-800">{value}</dd></div></div>)}</dl>}</section></div></main>;
+}
+
+function DetailState({ children }: { children: React.ReactNode }) { return <main className="flex min-h-full items-center justify-center bg-gray-50 p-6 text-sm text-gray-500">{children}</main>; }

@@ -2,3 +2,4 @@ node_modules/
 logs/
 .pids/
 backend/media/
+.DS_Store
