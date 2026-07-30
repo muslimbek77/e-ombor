@@ -1,135 +1,7 @@
-import { useState } from "react";
-import {
-  LayoutDashboard,
-  Building2,
-  ShoppingCart,
-  FileText,
-  Users,
-  Package,
-  Boxes,
-  Layers,
-  Calculator,
-  FolderOpen,
-  BarChart2,
-  ClipboardList,
-  MessageSquare,
-  Bell,
-  UserCog,
-  Settings,
-  History,
-  MapPin,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface NavItem {
-  label: string;
-  icon: React.ReactNode;
-  href: string;
-  badge?: number;
-}
-
-interface SidebarProps {
-  activeItem?: string;
-  onNavigate?: (href: string) => void;
-}
-
-// ── Nav groups ─────────────────────────────────────────────────────────────────
-
-const ASOSIY: NavItem[] = [
-  {
-    label: "Boshqaruv paneli",
-    icon: <LayoutDashboard size={18} />,
-    href: "/",
-  },
-  {
-    label: "Qurilish obyektlari",
-    icon: <Building2 size={18} />,
-    href: "/objects",
-  },
-  {
-    label: "Xaridlar",
-    icon: <ShoppingCart size={18} />,
-    href: "/purchases",
-  },
-  {
-    label: "Shartnomalar",
-    icon: <FileText size={18} />,
-    href: "/contracts",
-  },
-  {
-    label: "Supplierlar",
-    icon: <Users size={18} />,
-    href: "/suppliers",
-  },
-  {
-    label: "Manzillar",
-    icon: <MapPin size={18} />,
-    href: "/addresses",
-  },
-  {
-    label: "Ombor",
-    icon: <Package size={18} />,
-    href: "/warehouse",
-  },
-  {
-    label: "Inventar",
-    icon: <Boxes size={18} />,
-    href: "/inventory",
-  },
-  {
-    label: "Materiallar",
-    icon: <Layers size={18} />,
-    href: "/materials",
-  },
-  {
-    label: "Hisob-fakturalar",
-    icon: <Calculator size={18} />,
-    href: "/invoices",
-  },
-  {
-    label: "Hujjatlar",
-    icon: <FolderOpen size={18} />,
-    href: "/documents",
-  },
-  {
-    label: "Zayavkalar",
-    icon: <ClipboardList size={18} />,
-    href: "/production-requests",
-  },
-  {
-    label: "Hisobotlar",
-    icon: <BarChart2 size={18} />,
-    href: "/reports",
-  },
-  {
-    label: "Murojaatlar",
-    icon: <MessageSquare size={18} />,
-    href: "/tickets",
-  },
-  {
-    label: "Bildirishnomalar",
-    icon: <Bell size={18} />,
-    href: "/notifications",
-  },
-  {
-    label: "Foydalanuvchilar",
-    icon: <UserCog size={18} />,
-    href: "/users",
-  },
-  {
-    label: "Audit jurnali",
-    icon: <History size={18} />,
-    href: "/audit-logs",
-  },
-  {
-    label: "Sozlamalar",
-    icon: <Settings size={18} />,
-    href: "/settings",
-  },
-];
+import { ASOSIY, matchNavHref } from "./navItems";
+import type { NavItem } from "./navItems";
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -277,15 +149,12 @@ function FooterCopyright() {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export default function Sidebar({ activeItem = "/" }: SidebarProps) {
-  const [active, setActive] = useState(activeItem);
+export default function Sidebar() {
+  const { pathname } = useLocation();
+  const active = matchNavHref(pathname);
   const navigate = useNavigate();
   const { data: notifications } = useNotifications();
   const unreadCount = (notifications ?? []).filter((n) => !n.is_read).length;
-  const handleClick = (href: string) => {
-    setActive(href);
-    navigate(href);
-  };
 
   return (
     <aside
@@ -320,7 +189,7 @@ export default function Sidebar({ activeItem = "/" }: SidebarProps) {
             key={item.href}
             item={item.href === "/notifications" && unreadCount > 0 ? { ...item, badge: unreadCount } : item}
             isActive={active === item.href}
-            onClick={() => handleClick(item.href)}
+            onClick={() => navigate(item.href)}
           />
         ))}
       </nav>

@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Bell, Building2, ChevronDown, Megaphone } from "lucide-react";
+import { Bell, Building2, ChevronDown } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
+import { ASOSIY, matchNavHref } from "./navItems";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -52,6 +52,22 @@ function getUzbekDate(): string {
   const dayName = uzDays[now.getDay()];
 
   return `Bugungi sana: ${day}-${month}, ${year} • ${dayName}`;
+}
+
+/** Sidebar'da ko'rinmaydigan, lekin sarlavhaga muhtoj sahifalar. */
+const EXTRA_TITLES: Record<string, string> = {
+  "/profile": "Profil",
+};
+
+/** Sarlavha ham URL'dan olinadi, shunda sahifa yangilanganda saqlanib qoladi. */
+function getPageTitle(pathname: string): string {
+  const href = matchNavHref(pathname);
+
+  return (
+    ASOSIY.find((item) => item.href === href)?.label ??
+    EXTRA_TITLES[pathname] ??
+    "Sahifa topilmadi"
+  );
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -175,13 +191,15 @@ function UserMenu() {
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function Header({
-  pageTitle = "Boshqaruv paneli",
+  pageTitle,
   pageSubtitle,
   notificationCount,
   companyName = "Ko'prikQurilish AJ",
   onNotificationClick,
   onCompanyClick,
 }: HeaderProps) {
+  const { pathname } = useLocation();
+  const title = pageTitle ?? getPageTitle(pathname);
   const subtitle = pageSubtitle ?? getUzbekDate();
   const navigate = useNavigate();
   const { data: notifications } = useNotifications();
@@ -197,7 +215,7 @@ export default function Header({
       }}
     >
       {/* ── Left: page title + date ── */}
-      <PageInfo title={pageTitle} subtitle={subtitle} />
+      <PageInfo title={title} subtitle={subtitle} />
 
       {/* ── Right: actions ── */}
       <div className="flex items-center gap-3">
