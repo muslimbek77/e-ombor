@@ -117,26 +117,6 @@ function NavLink({
   );
 }
 
-function SystemStatus() {
-  return (
-    <div className="mx-4 mb-4">
-      <div className="flex items-center gap-2">
-        {/* Pulsing green dot */}
-        <div className="relative flex-shrink-0">
-          <div className="w-2 h-2 rounded-full bg-green-500" />
-          <div className="absolute inset-0 w-2 h-2 rounded-full bg-green-400 animate-ping opacity-60" />
-        </div>
-        <div>
-          <div className="text-white text-xs font-semibold">Tizim holati</div>
-          <div className="text-gray-400 text-xs">
-            Barcha tizimlar ishlayapti
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function FooterCopyright() {
   return (
     <div className="px-4 pb-4">

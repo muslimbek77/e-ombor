@@ -32,8 +32,8 @@ export default function ObjectDetailPage() {
   const statusStyle = getStatusStyle(site.status);
 
   function handleDelete() {
-    if (!window.confirm(`“${site.name}” obyektini o‘chirmoqchimisiz?`)) return;
-    deleteSite.mutate(site.id, {
+    if (!window.confirm(`“${site!.name}” obyektini o‘chirmoqchimisiz?`)) return;
+    deleteSite.mutate(site!.id, {
       onSuccess: () => navigate("/objects", { replace: true }),
     });
   }
