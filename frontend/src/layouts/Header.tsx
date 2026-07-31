@@ -2,6 +2,9 @@ import { Bell, Building2, ChevronDown } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
 import { ASOSIY, matchNavHref } from "./navItems";
+import { canAccessPath } from "../lib/permissions";
+import { useAuthStore } from "../stores/authStore";
+import { roleLabel } from "../pages/users/usersUtils";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -60,8 +63,11 @@ const EXTRA_TITLES: Record<string, string> = {
 };
 
 /** Sarlavha ham URL'dan olinadi, shunda sahifa yangilanganda saqlanib qoladi. */
-function getPageTitle(pathname: string): string {
+function getPageTitle(pathname: string, user: Parameters<typeof canAccessPath>[0]): string {
   const href = matchNavHref(pathname);
+  // Roli yetmagan bo'limda sahifa o'rniga "Ruxsat yo'q" chiqadi — sarlavha ham
+  // shunga mos bo'lishi kerak, aks holda yopiq bo'lim nomi ko'rinib qoladi.
+  if (href && !canAccessPath(user, href)) return "Ruxsat yo'q";
 
   return (
     ASOSIY.find((item) => item.href === href)?.label ??
@@ -144,8 +150,11 @@ function CompanyBadge({
 
 function UserMenu() {
   const navigate = useNavigate();
-  const userName = "Jasur Dilmurodov";
-  const userRole = "Rais";
+  const user = useAuthStore((state) => state.user);
+  const userName = user?.full_name?.trim() || user?.email || "Foydalanuvchi";
+  // Bir nechta rolli foydalanuvchida hammasini ko'rsatamiz — kim qaysi vakolat
+  // bilan ishlayotgani sarlavhadan ko'rinib tursin.
+  const userRole = (user?.roles ?? []).map(roleLabel).join(", ") || "—";
   const initials = userName
     .split(" ")
     .map((n) => n[0])
@@ -199,7 +208,8 @@ export default function Header({
   onCompanyClick,
 }: HeaderProps) {
   const { pathname } = useLocation();
-  const title = pageTitle ?? getPageTitle(pathname);
+  const currentUser = useAuthStore((state) => state.user);
+  const title = pageTitle ?? getPageTitle(pathname, currentUser);
   const subtitle = pageSubtitle ?? getUzbekDate();
   const navigate = useNavigate();
   const { data: notifications } = useNotifications();
