@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { isAxiosError } from "axios";
 import { useLogin } from "../../hooks/auth/useLogin";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<FormErrors>({ email: "", password: "" });
   const [showPass, setShowPass] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [formError, setFormError] = useState("");
   const passwordRef = useRef<HTMLInputElement>(null);
 
   const navigate = useNavigate();
@@ -56,6 +58,7 @@ export default function LoginPage() {
 
   const loginMutation = useLogin();
   const handleLogin = () => {
+    setFormError("");
     if (!validate()) return;
 
     loginMutation.mutate(form, {
@@ -66,7 +69,12 @@ export default function LoginPage() {
       },
 
       onError(error) {
-        console.log(error);
+        // Server javobini ajratamiz: noto'g'ri login bilan tarmoq uzilishini
+        // foydalanuvchi bir xil xabardan farqlay olishi kerak.
+        const status = isAxiosError(error) ? error.response?.status : undefined;
+        if (status === 401) setFormError("Elektron pochta yoki parol noto'g'ri.");
+        else if (status) setFormError("Kirishda xatolik yuz berdi. Qayta urinib ko'ring.");
+        else setFormError("Serverga ulanib bo'lmadi. Internet aloqasini tekshiring.");
       },
     });
   };
@@ -139,6 +147,16 @@ export default function LoginPage() {
               />
             </svg>
             Muvaffaqiyatli kirildi! Yo'naltirilmoqda...
+          </div>
+        )}
+
+        {/* Error banner */}
+        {formError && (
+          <div role="alert" className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 text-red-700 text-[13.5px]">
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {formError}
           </div>
         )}
 
