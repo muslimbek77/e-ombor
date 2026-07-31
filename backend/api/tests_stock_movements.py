@@ -275,3 +275,69 @@ class StockMovementCreateTests(APITestCase):
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data["reference_doc"], doc.id)
         self.assertEqual(r.data["notes"], "hujjat asosida")
+
+
+class InventoryWriteRoleTests(APITestCase):
+    """Zaxira yozuvini yaratish va tuzatish ham ombor harakati bilan bir xil rolni talab qiladi."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.branch = Branch.objects.create(name="Markaz", code="MRK")
+        cls.warehouse = Warehouse.objects.create(name="Ombor 1", code="W1", branch=cls.branch)
+        cls.material = Material.objects.create(name="Sement", code="M1")
+        cls.keeper = User.objects.create_user(
+            email="w@t.uz", password="Pass12345!", roles=["warehouse"], branch=cls.branch
+        )
+        cls.prorab = User.objects.create_user(
+            email="p@t.uz", password="Pass12345!", roles=["prorab"], branch=cls.branch
+        )
+        cls.admin = User.objects.create_user(
+            email="a@t.uz", password="Pass12345!", roles=["admin"], is_staff=True
+        )
+
+    def create_payload(self):
+        return {"warehouse": self.warehouse.id, "material": self.material.id, "quantity": "5"}
+
+    def post_create(self, user):
+        self.client.force_authenticate(user)
+        return self.client.post(reverse("inventory-list"), self.create_payload(), format="json")
+
+    def patch_adjust(self, user, item):
+        self.client.force_authenticate(user)
+        return self.client.patch(
+            reverse("inventory-update", args=[item.id]), {"quantity_delta": "3"}, format="json"
+        )
+
+    def test_keeper_can_create(self):
+        self.assertEqual(self.post_create(self.keeper).status_code, 201)
+
+    def test_admin_can_create(self):
+        self.assertEqual(self.post_create(self.admin).status_code, 201)
+
+    def test_prorab_cannot_create(self):
+        self.assertEqual(self.post_create(self.prorab).status_code, 403)
+        self.assertFalse(InventoryItem.objects.exists())
+
+    def test_keeper_can_adjust(self):
+        item = InventoryItem.objects.create(
+            warehouse=self.warehouse, material=self.material, quantity=Decimal("2")
+        )
+        self.assertEqual(self.patch_adjust(self.keeper, item).status_code, 200)
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, Decimal("5.000"))
+
+    def test_prorab_cannot_adjust(self):
+        item = InventoryItem.objects.create(
+            warehouse=self.warehouse, material=self.material, quantity=Decimal("2")
+        )
+        self.assertEqual(self.patch_adjust(self.prorab, item).status_code, 403)
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, Decimal("2.000"))
+        self.assertFalse(StockMovement.objects.exists())
+
+    def test_prorab_can_still_read(self):
+        InventoryItem.objects.create(
+            warehouse=self.warehouse, material=self.material, quantity=Decimal("2")
+        )
+        self.client.force_authenticate(self.prorab)
+        self.assertEqual(self.client.get(reverse("inventory-list")).status_code, 200)

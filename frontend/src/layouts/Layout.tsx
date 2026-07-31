@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
+import RoleRoute from "../routs/RoleRoute";
 
 const Layout = () => {
   return (
@@ -17,7 +18,9 @@ const Layout = () => {
           <Header />
 
           <main className="flex-1 p-6 bg-white rounded-b-2xl">
-            <Outlet />
+            <RoleRoute>
+              <Outlet />
+            </RoleRoute>
           </main>
         </div>
       </div>

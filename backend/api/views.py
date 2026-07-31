@@ -105,6 +105,11 @@ def is_admin(user):
     return user.is_staff or bool(ADMIN_ROLES.intersection(user.roles or []))
 
 
+def can_manage_stock(user):
+    """Zaxira o'zgartiradigan har qanday amal — faqat omborchi va admin."""
+    return is_admin(user) or bool(set(user.roles or []).intersection(STOCK_MOVEMENT_ROLES))
+
+
 def branch_scope(queryset, user, field_name="branch"):
     if is_admin(user) or not user.branch_id:
         return queryset
@@ -879,6 +884,16 @@ class InventoryListView(generics.ListCreateAPIView):
             {"warehouse": "warehouse_id", "material": "material_id"},
         )
 
+    def create(self, request, *args, **kwargs):
+        # Yangi zaxira yozuvi ham StockMovement (IN) tug'diradi — shuning uchun
+        # ombor harakati bilan bir xil rol talab qilinadi.
+        if not can_manage_stock(request.user):
+            return Response(
+                {"error": "Zaxira yozuvini yaratish uchun sizda ruxsat yo'q"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         warehouse = serializer.validated_data["warehouse"]
         quantity = serializer.validated_data.get("quantity", Decimal("0"))
@@ -915,6 +930,12 @@ class InventoryUpdateView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def patch(self, request, pk):
+        if not can_manage_stock(request.user):
+            return Response(
+                {"error": "Zaxirani o'zgartirish uchun sizda ruxsat yo'q"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         item = branch_scope(
             InventoryItem.objects.select_related("warehouse", "warehouse__branch", "material"),
             request.user,
@@ -990,7 +1011,7 @@ class StockMovementListView(generics.ListCreateAPIView):
         return queryset
 
     def create(self, request, *args, **kwargs):
-        if not (is_admin(request.user) or bool(set(request.user.roles or []).intersection(STOCK_MOVEMENT_ROLES))):
+        if not can_manage_stock(request.user):
             return Response(
                 {"error": "Ombor harakatini yaratish uchun sizda ruxsat yo'q"},
                 status=status.HTTP_403_FORBIDDEN,

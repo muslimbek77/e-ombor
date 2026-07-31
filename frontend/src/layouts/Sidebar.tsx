@@ -1,7 +1,8 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
-import { ASOSIY, matchNavHref } from "./navItems";
+import { matchNavHref, visibleNavItems } from "./navItems";
 import type { NavItem } from "./navItems";
+import { useAuthStore } from "../stores/authStore";
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -135,6 +136,8 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const { data: notifications } = useNotifications();
   const unreadCount = (notifications ?? []).filter((n) => !n.is_read).length;
+  const user = useAuthStore((state) => state.user);
+  const navItems = visibleNavItems(user);
 
   return (
     <aside
@@ -164,7 +167,7 @@ export default function Sidebar() {
 
       {/* ── Nav items ── */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-1 pb-2 space-y-0.5 scrollbar-thin">
-        {ASOSIY.map((item) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.href}
             item={item.href === "/notifications" && unreadCount > 0 ? { ...item, badge: unreadCount } : item}

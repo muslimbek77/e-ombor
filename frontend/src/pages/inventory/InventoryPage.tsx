@@ -5,6 +5,7 @@ import { useWarehouses } from "../../hooks/useWarehouses";
 import { InventoryCard } from "./InventoryCard";
 import { InventoryForm } from "./InventoryForm";
 import type { InventoryItemPayload } from "../../types/inventory";
+import { STOCK_MOVEMENT_ROLES, useHasRole } from "../../lib/permissions";
 
 export default function InventoryPage() {
   const [query, setQuery] = useState("");
@@ -12,6 +13,7 @@ export default function InventoryPage() {
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const deferredQuery = useDeferredValue(query);
+  const canManageStock = useHasRole(STOCK_MOVEMENT_ROLES);
 
   const { data: warehouses = [] } = useWarehouses();
   const { data: items = [], isPending, isError } = useInventory(warehouseFilter ? { warehouse: Number(warehouseFilter) } : undefined);
@@ -36,9 +38,11 @@ export default function InventoryPage() {
             <p className="mt-0.5 text-sm text-gray-400">{isPending ? "Yuklanmoqda..." : `${filteredItems.length} ta zaxira yozuvi`}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
-              <Plus size={16} /> Zaxira qo'shish
-            </button>
+            {canManageStock && (
+              <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
+                <Plus size={16} /> Zaxira qo'shish
+              </button>
+            )}
             <label className="relative">
               <span className="sr-only">Inventarni qidirish</span>
               <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />

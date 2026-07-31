@@ -18,6 +18,7 @@ import {
   History,
   MapPin,
 } from "lucide-react";
+import { canAccessPath } from "../lib/permissions";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,14 @@ export const ASOSIY: NavItem[] = [
     href: "/settings",
   },
 ];
+
+/**
+ * Foydalanuvchi rollariga ko'ra ko'rinadigan bo'limlar.
+ * Ruxsat jadvali `lib/permissions.ts` da — bu yerda faqat filtrlaymiz.
+ */
+export function visibleNavItems(user: Parameters<typeof canAccessPath>[0]): NavItem[] {
+  return ASOSIY.filter((item) => canAccessPath(user, item.href));
+}
 
 /**
  * Joriy manzilga mos keladigan nav item'ning href'ini qaytaradi.

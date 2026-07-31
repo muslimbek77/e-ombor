@@ -8,12 +8,14 @@ import { MovementForm } from "./MovementForm";
 import { formatDateTime } from "../tickets/ticketUtils";
 import type { InventoryAdjustmentPayload } from "../../types/inventory";
 import type { StockMovementCreatePayload } from "../../types/stockMovement";
+import { STOCK_MOVEMENT_ROLES, useHasRole } from "../../lib/permissions";
 
 export default function InventoryDetailPage() {
   const { id } = useParams();
   const itemId = Number(id);
   const [isAdjustOpen, setIsAdjustOpen] = useState(false);
   const [isMovementOpen, setIsMovementOpen] = useState(false);
+  const canManageStock = useHasRole(STOCK_MOVEMENT_ROLES);
 
   const { data: item, isPending, isError } = useInventoryItem(itemId);
   const adjustInventoryItem = useAdjustInventoryItem();
@@ -43,14 +45,16 @@ export default function InventoryDetailPage() {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => setIsMovementOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-                <ArrowLeftRight size={15} /> Harakat qo'shish
-              </button>
-              <button type="button" onClick={() => setIsAdjustOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
-                <SlidersHorizontal size={15} /> Miqdorni tuzatish
-              </button>
-            </div>
+            {canManageStock && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setIsMovementOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                  <ArrowLeftRight size={15} /> Harakat qo'shish
+                </button>
+                <button type="button" onClick={() => setIsAdjustOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
+                  <SlidersHorizontal size={15} /> Miqdorni tuzatish
+                </button>
+              </div>
+            )}
           </div>
 
           <dl className="grid gap-4 sm:grid-cols-2">

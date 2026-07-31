@@ -5,6 +5,7 @@ import { useContracts, useCreateContract } from "../../hooks/useContracts";
 import { ContractCard } from "./ShartnomaContractCard";
 import { ContractForm } from "./ShartnomaForm";
 import type { ContractPayload } from "../../types/shartnoma";
+import { CONTRACT_ROLES, useHasRole } from "../../lib/permissions";
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ const ShartnomalarPage = () => {
 
   const { data: contracts = [], isLoading: loading, error } = useContracts();
   const createContract = useCreateContract();
+  const canManageContracts = useHasRole(CONTRACT_ROLES);
 
   const filtered = contracts.filter((c) => {
     if (query.trim() === "") return true;
@@ -37,13 +39,15 @@ const ShartnomalarPage = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
-            >
-              <Plus size={16} /> Shartnoma qo'shish
-            </button>
+            {canManageContracts && (
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
+              >
+                <Plus size={16} /> Shartnoma qo'shish
+              </button>
+            )}
             <div className="relative">
               <Search
                 size={15}

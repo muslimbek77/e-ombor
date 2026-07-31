@@ -10,9 +10,9 @@ interface User {
   phone: string;
   stir_inn: string;
   roles: string[];
-  branch: null;
-  is_active: true;
-  is_staff: false;
+  branch: number | null;
+  is_active: boolean;
+  is_staff: boolean;
   last_login: string;
   created_at: string;
   updated_at: string;
