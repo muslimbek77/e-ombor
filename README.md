@@ -1,141 +1,164 @@
-# E-Ombor Platform
+# E-Ombor
 
-O'zbekiston davlat xizmatlari va tashkilotlar uchun mo'ljallangan birlashtirilgan boshqaruv platformasi.
+![Django](https://img.shields.io/badge/Django-4.2-092E20?logo=django&logoColor=white)
+![DRF](https://img.shields.io/badge/DRF-3.15-A30000)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
+![Tests](https://img.shields.io/badge/testlar-75%20passing-2ea44f)
 
-## 📋 Mazmuni
+Qurilish tashkilotlari uchun ombor, hujjat aylanishi va moliya boshqaruvi
+platformasi. Filiallar, qurilish obyektlari va omborlar bo'yicha
+markazlashtirilgan hisob; xarid so'rovi rahbariyat tasdig'idan to'lovgacha
+bitta zanjirda kuzatiladi.
 
-- [🏗 Arxitektura](#-arxitektura)
-- [✨ Xususiyatlar](#-xususiyarlar)
-- [🚀 Tezkor boshlash](#-tezkor-boshlash)
-- [📡 API Hujjatlari](#-api-hujjatlari)
-- [🗄 Ma'lumotlar modeli](#-ma'lumotlar-modeli)
-- [🔐 Xavfsizlik](#-xavfsizlik)
-- [📦 Loyiha tuzilishi](#-loyiha-tuzilishi)
-- [🔮 Keyingi bosqichlar](#-keyingi-bosqichlar)
+**Jonli demo:** https://e-ombor-uz.vercel.app
+
+| | |
+|---|---|
+| Backend | Django 4.2 + DRF, JWT autentifikatsiya, 50 endpoint, 21 model |
+| Frontend | React 19 + TypeScript + Vite, TanStack Query, Tailwind v4 |
+| Baza | SQLite (dev) / PostgreSQL (prod) |
+| Testlar | 75 ta (`python manage.py test api`) |
+
+> **Tizim mantiqi to'liq bayon qilingan:** [`docs/TIZIM.md`](docs/TIZIM.md) —
+> rol matritsasi, filial izolyatsiyasi qoidasi, hujjat oqimi, ombor va moliya
+> mantiqi.
 
 ---
 
-## 🏗 Arxitektura
+## Arxitektura
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Foydalanuvchi (Browser)                 │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ HTTP/REST
-┌──────────────────────────▼──────────────────────────────────┐
-│                    Frontend (alohida repo)                    │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ REST API
-┌──────────────────────────▼──────────────────────────────────┐
-│              Django REST Framework (Backend)                 │
-│  ┌─────────────┐  ┌──────────────┐  ┌───────────────────┐   │
-│  │   Auth       │  │  Views       │  │  Serializers      │   │
-│  │  JWT Token   │  │  APIViews    │  │  DRF              │   │
-│  └─────────────┘  └──────────────┘  └───────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              Models (Django ORM)                        │ │
-│  │  User │ Document │ PurchaseOrder │ Invoice │ Ticket     │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────────┐
-│                    SQLite / PostgreSQL                       │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    B["Brauzer"] -->|HTTPS| F["React + TypeScript<br/>frontend/"]
+    F -->|"REST, JWT Bearer"| V["views.py — 50 endpoint<br/>rol va filial tekshiruvi"]
+    V --> S["serializers.py"]
+    S --> MO["models.py — 21 model<br/>Django ORM"]
+    MO --> D[("SQLite / PostgreSQL")]
 ```
 
----
-
-## ✨ Xususiyatlar
-
-### 🔐 Autentifikatsiya va Avtorizatsiya
-- Ro'yxatdan o'tish va kirish (JWT token)
-- Foydalanuvchi rollari (admin, foydalanuvchi)
-- Profilni ko'rish va tahrirlash
-- Parolni o'zgartirish
-
-### 📄 Hujjat boshqaruvi
-- Hujjatlarni yaratish, ko'rish, tahrirlash va o'chirish
-- Hujjat turlari (buyurtma, akt, hisobot va b.)
-- Hujjat fayllarini yuklash (PDF, rasm, hujjat — max 10MB)
-- Har bir hujjatga biriktirilgan fayllar ro'yxati
-
-### 🏭 Ishlab chiqarish ob'ektlari
-- Tashkilot sho'ba bo'limlari (Branch)
-- Qurilish maydonchalari (ConstructionSite)
-- Omborxonalar (Warehouse)
-- Materiallar va inventarizatsiya (Material, InventoryItem)
-- Ombor harakatlari (kirish/chiqish)
-
-### 🛒 Xarid va Yetkazib beruvchilar
-- Yetkazib beruvchilar bazasi (Supplier)
-- Xarid buyurtmalari (PurchaseOrder)
-- Buyurtma bandlari (PurchaseOrderItem)
-
-### 💰 Moliya bo'limi
-- **Shartnomalar** (Contract) — raqam, sana, summa
-- **Hisob-fakturalar** (Invoice) — to'lov holati: to'lanmagan / qisman / to'liq
-- **To'lovlar** (Payment) — avtomatik hisob-faktura yangilanishi
-
-### 📋 Ishlab chiqarish zayavkalari
-- Qurilish maydonchasidan zayavka yaratish
-- Avtomatik raqam generatsiya (PR-YYYYMMDD-XXXX)
-- Holat kuzatish: kutilmoqda → tasdiqlandi → yetkazildi → bekor qilindi
-
-### 🎫 Murojaat tizimi (Ticketing)
-- Kategoriya: material yetishmasligi, texnika, ishchi kuchi, boshqa
-- Ustuvorlik: past, o'rta, yuqori, shoshilinch
-- Holat: ochiq → jarayonda → yechildi → yopildi
-- Foydalanuvchiga faqat o'z murojaatlari ko'rinadi (staff — barchasi)
-
-### 📍 Manzillar
-- Shahar, tuman, ko'cha, bino bo'yicha tizimlashtirish
-- Noyob kombinatsiya tekshiruvi
-
-### 📊 Dashboard
-- Umumiy statistika: foydalanuvchilar, hujjatlar, ombor, buyurtmalar
-- Kam qolgan materiallar
-- So'nggi hujjatlar
-- O'qilmagan bildirishnomalar
-
-### 🔔 Bildirishnomalar
-- Yaratilgan va tahrirlangan hujjatlar haqida
-- O'qilgan deb belgilash va hammasini o'qish
+Frontend uch qatlamli: `api/` (axios) → `hooks/` (TanStack Query) → `pages/`.
+Har bir domen shu qolipni takrorlaydi.
 
 ---
 
-## 🚀 Tezkor boshlash
+## Rollar va ruxsatlar
+
+Rollar alohida jadval emas — `User.roles` bu JSON ro'yxat, mumkin bo'lgan
+qiymatlar `User.ROLES` konstantasida. Bitta foydalanuvchida bir nechta rol
+bo'lishi mumkin.
+
+| Rol | Vazifasi |
+|---|---|
+| `admin` | Tizim administratori — hamma narsaga kiradi |
+| `ceo` | Boshqaruv raisi — hujjatni yakuniy tasdiqlaydi |
+| `architecture` | Arxitektura va rejalashtirish — birinchi tasdiq |
+| `procurement` | Xaridlar boshqarmasi |
+| `accountant` | Buxgalter |
+| `warehouse` | Omborchi |
+| `prorab` | Prorab — obyektdan zayavka beradi |
+| `branch_manager` | Filial rahbari |
+
+**O'zgartirish huquqi** (o'qish barcha rollarga ochiq, filial doirasida):
+
+| Soha | Kim yozadi |
+|---|---|
+| Filial, material, ombor, manzil | `admin` |
+| Yetkazib beruvchi | `admin`, `procurement` |
+| Qurilish obyekti | `admin`, `branch_manager`, `architecture` |
+| Xarid buyurtmasi, shartnoma | `admin`, `procurement` |
+| Hisob-faktura | `admin`, `accountant`, `procurement` |
+| To'lov | `admin`, `accountant` |
+| Ombor harakati va zaxira | `admin`, `warehouse` |
+| Hujjatni tahrirlash/o'chirish | Muallifi, `admin`, `procurement`, `branch_manager` |
+| Foydalanuvchilar | `admin` |
+
+### Filial izolyatsiyasi
+
+| Foydalanuvchi | Ko'radigan ma'lumot |
+|---|---|
+| Admin | Hammasi |
+| Filiali bor xodim | Faqat o'z filiali |
+| Filiali yo'q hisob | Hech nima |
+
+Chegaralash ro'yxat va tafsilot endpointlarida bir xil ishlaydi — id ni
+taxmin qilib begona filial yozuviga kirib bo'lmaydi.
+
+---
+
+## Hujjat oqimi
+
+`Document` — o'nta holatli avtomat. Har bir o'tish aniq rol talab qiladi.
+
+```mermaid
+stateDiagram-v2
+    [*] --> created
+    created --> architecture: submit (prorab, procurement)
+    architecture --> ceo: approve (architecture)
+    architecture --> rejected: reject
+    ceo --> approved: approve (ceo)
+    ceo --> rejected: reject
+    approved --> contract: advance (procurement)
+    contract --> payment: advance (procurement, accountant)
+    payment --> delivering: advance (accountant)
+    delivering --> received: advance (warehouse)
+    received --> closed: close (warehouse, prorab)
+    rejected --> created: reopen (procurement, prorab)
+    closed --> [*]
+```
+
+Rad etishda sabab majburiy. Har o'tish `DocumentApproval` yozuvi va audit
+logi qoldiradi. `admin` har qanday o'tishni bajara oladi.
+
+---
+
+## Tezkor boshlash
 
 ### Talablar
-- Python 3.9+
+
+- Python 3.11+
+- Node.js 20+
 - (ixtiyoriy) PostgreSQL 14+
 
-### Backend o'rnatish
+### Backend
 
 ```bash
 cd backend
 
-# Virtual muhit yaratish
 python3 -m venv venv
 source venv/bin/activate
-
-# Bog'liqliklarni o'rnatish
 pip install -r requirements.txt
 
-# Ma'lumotlar bazasini migratsiya qilish
 python manage.py migrate
-
-# Superuser yaratish (boshqaruv paneli uchun)
-python manage.py createsuperuser
-
-# Dev serverni ishga tushirish
+python manage.py createsuperuser     # admin panel uchun
 python manage.py runserver 0.0.0.0:3000
 ```
 
-Backend `http://localhost:3000` da ishga tushadi.
-DRF Swagger hujjatlari: `http://localhost:3000/api/docs/`
-OpenAPI sxemasi: `http://localhost:3000/api/schema/`
+| Manzil | Nima |
+|---|---|
+| `http://localhost:3000/api/` | API |
+| `http://localhost:3000/api/docs/` | Swagger (interaktiv hujjat) |
+| `http://localhost:3000/api/schema/` | OpenAPI sxemasi |
+| `http://localhost:3000/admin/` | Django admin paneli |
 
-### Backend .env sozlamalari
+### Frontend
+
+```bash
+cd frontend
+
+npm install
+npm run dev       # Vite dev server
+```
+
+Boshqa komandalar: `npm run build` (tsc + vite build), `npm run lint`,
+`npm run preview`.
+
+API manzili `.env` dagi `VITE_API_URL` orqali beriladi. Standart qiymat
+`/api` — Vite dev server so'rovni backendga uzatadi (`vite.config.ts`
+dagi `server.proxy`), shu sabab bir xil Wi-Fi'dagi boshqa qurilmada ham
+ishlaydi.
+
+### Backend `.env`
 
 ```env
 DEBUG=True
@@ -147,275 +170,165 @@ DB_HOST=localhost
 DB_PORT=5432
 ```
 
-### Demo ma'lumotlar
+Ildizdagi `setup_and_run.sh` backendni bir komanda bilan ko'taradi
+(`./setup_and_run.sh`, `stop`, `status`).
 
-Backend tayyor bo'lgach:
+---
+
+## Demo ma'lumotlar
 
 ```bash
 cd backend
-python3 manage.py seed_demo_data
+python manage.py seed_demo_data      # to'liq demo to'plam
+python manage.py flush_demo_data     # tozalash — user, rol va filial qoladi
+python manage.py flush_demo_data --dry-run   # nima o'chishini ko'rsatadi
 ```
+
+`flush_demo_data` foydalanuvchilar, ularning rollari va filiallarni saqlaydi.
+Filial `User.branch` uchun zarur — u o'chsa xodimlar filialsiz qolib, hech
+narsa ko'rmay qoladi.
 
 Demo loginlar:
 
-- `admin@eombor.uz` / `Admin123!`
-- `ceo@eombor.uz` / `Ceo12345!`
-- `procurement@eombor.uz` / `Procure123!`
-- `accountant@eombor.uz` / `Account123!`
-- `warehouse@eombor.uz` / `Warehouse123!`
-- `prorab@eombor.uz` / `Prorab123!`
-- `branch@eombor.uz` / `Branch123!`
-- `architecture@eombor.uz` / `Arch12345!`
-- `site.engineer@eombor.uz` / `Engineer123!`
+| Email | Parol | Rol |
+|---|---|---|
+| `admin@eombor.uz` | `Admin123!` | admin |
+| `ceo@eombor.uz` | `Ceo12345!` | ceo |
+| `architecture@eombor.uz` | `Arch12345!` | architecture |
+| `procurement@eombor.uz` | `Procure123!` | procurement |
+| `accountant@eombor.uz` | `Account123!` | accountant |
+| `warehouse@eombor.uz` | `Warehouse123!` | warehouse |
+| `prorab@eombor.uz` | `Prorab123!` | prorab |
+| `branch@eombor.uz` | `Branch123!` | branch_manager |
+| `site.engineer@eombor.uz` | `Engineer123!` | architecture + procurement |
 
 ---
 
-## 📡 API Hujjatlari
+## API
 
-### Autentifikatsiya
+To'liq va har doim dolzarb hujjat — **Swagger:** `/api/docs/`
+(sxema `/api/schema/`). Quyida domenlar bo'yicha xarita.
 
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| POST | `/api/auth/register/` | Yangi foydalanuvchi ro'yxatdan o'tkazish |
-| POST | `/api/auth/login/` | Kirish (access + refresh token) |
-| POST | `/api/auth/refresh/` | Token yangilash |
-| POST | `/api/auth/logout/` | Chiqish (refresh tokenni blacklist qilish) |
-| POST | `/api/auth/change-password/` | Parolni o'zgartirish |
-| GET | `/api/auth/user/` | Joriy foydalanuvchi ma'lumotlari |
-| PUT/PATCH | `/api/auth/user/` | Profilni tahrirlash |
+| Domen | Bazaviy manzil | Yozish huquqi |
+|---|---|---|
+| Auth | `/api/auth/` — `register`, `login`, `refresh`, `logout`, `user`, `change-password` | — |
+| Foydalanuvchilar | `/api/users/` | `admin` |
+| Hujjatlar | `/api/documents/` + `{id}/workflow/`, `{id}/archive/`, `{id}/files/`, `export/` | muallif, `admin`, `procurement`, `branch_manager` |
+| Xarid | `/api/purchase-orders/` | `admin`, `procurement` |
+| Ma'lumotnoma | `/api/materials/`, `/api/warehouses/`, `/api/branches/`, `/api/addresses/` | `admin` |
+| Yetkazib beruvchilar | `/api/suppliers/` | `admin`, `procurement` |
+| Obyektlar | `/api/sites/` | `admin`, `branch_manager`, `architecture` |
+| Ombor | `/api/inventory/`, `/api/stock-movements/`, `/api/inventory/export/` | `admin`, `warehouse` |
+| Moliya | `/api/contracts/`, `/api/invoices/`, `/api/payments/`, `/api/invoices/{id}/payments/` | `admin`, `accountant`, `procurement` |
+| Zayavkalar | `/api/production-requests/` | filial xodimlari |
+| Murojaatlar | `/api/tickets/`, `/api/tickets/export/` | filial xodimlari |
+| Hisobot | `/api/dashboard/`, `/api/analytics/overview/` | — |
+| Bildirishnoma | `/api/notifications/`, `{id}/read/`, `read-all/` | egasi |
+| Audit | `/api/audit-logs/` | — |
 
-### Foydalanuvchilar (faqat admin)
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/users/` | Foydalanuvchilar ro'yxati |
-| POST | `/api/users/` | Yangi foydalanuvchi yaratish (rol va filial biriktirish bilan) |
-| GET | `/api/users/{id}/` | Foydalanuvchi tafsilotlari |
-| PUT/PATCH | `/api/users/{id}/` | Foydalanuvchini tahrirlash (parolni o'zgartirish ixtiyoriy) |
-| DELETE | `/api/users/{id}/` | Foydalanuvchini o'chirish |
-
-### Hujjatlar
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/documents/` | Hujjatlar ro'yxati |
-| POST | `/api/documents/` | Yangi hujjat yaratish |
-| GET | `/api/documents/export/` | Hujjatlarni CSV formatida yuklab olish |
-| GET | `/api/documents/{id}/` | Hujjat tafsilotlari |
-| PUT/PATCH | `/api/documents/{id}/` | Hujjatni tahrirlash |
-| DELETE | `/api/documents/{id}/` | Hujjatni o'chirish |
-| POST | `/api/documents/{id}/workflow/` | Workflow amali (submit/approve/reject/...) |
-| POST | `/api/documents/{id}/archive/` | Arxivlash / arxivdan chiqarish |
-| POST | `/api/documents/{id}/files/` | Fayl yuklash |
-| GET | `/api/documents/{id}/files/list/` | Fayllar ro'yxati |
-
-### Xarid buyurtmalari
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/purchase-orders/` | Buyurtmalar ro'yxati |
-| POST | `/api/purchase-orders/` | Yangi buyurtma (mavjud hujjat asosida, qatorlar bilan birga) — procurement, admin |
-| GET | `/api/purchase-orders/{id}/` | Buyurtma tafsilotlari |
-| PUT/PATCH | `/api/purchase-orders/{id}/` | Yetkazib beruvchi/qatorlarni tahrirlash — procurement, admin |
-| DELETE | `/api/purchase-orders/{id}/` | Buyurtmani o'chirish — procurement, admin |
-
-### Yetkazib beruvchilar
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/suppliers/` | Yetkazib beruvchilar ro'yxati |
-| POST | `/api/suppliers/` | Yangi yetkazib beruvchi |
-| GET | `/api/suppliers/{id}/` | Yetkazib beruvchi tafsilotlari |
-| PUT/PATCH | `/api/suppliers/{id}/` | Yetkazib beruvchini tahrirlash |
-| DELETE | `/api/suppliers/{id}/` | Yetkazib beruvchini o'chirish |
-
-### Ombor va Materiallar
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/materials/` | Materiallar ro'yxati |
-| POST | `/api/materials/` | Yangi material |
-| GET/PUT/PATCH/DELETE | `/api/materials/{id}/` | Material tafsilotlari va tahrirlash |
-| GET | `/api/warehouses/` | Omborxonalar ro'yxati |
-| POST | `/api/warehouses/` | Yangi omborxona |
-| GET/PUT/PATCH/DELETE | `/api/warehouses/{id}/` | Omborxona tafsilotlari va tahrirlash |
-| GET | `/api/inventory/` | Inventarizatsiya holati |
-| POST | `/api/inventory/` | Inventar yozuvini yaratish |
-| GET | `/api/inventory/export/` | Inventarizatsiyani CSV formatida yuklab olish |
-| PATCH | `/api/inventory/{id}/` | Qoldiqni korrektirovka qilish |
-| GET | `/api/stock-movements/` | Ombor harakatlari tarixi |
-| POST | `/api/stock-movements/` | Yangi harakat (IN/OUT/TRANSFER) — qoldiqni avtomatik yangilaydi |
-
-### Tashkilot
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/branches/` | Sho'ba bo'limlar |
-| POST | `/api/branches/` | Yangi sho'ba bo'lim |
-| GET/PUT/PATCH/DELETE | `/api/branches/{id}/` | Sho'ba bo'lim tafsilotlari va tahrirlash |
-| GET | `/api/sites/` | Qurilish maydonchalari |
-| POST | `/api/sites/` | Yangi qurilish maydonchasi |
-| GET/PUT/PATCH/DELETE | `/api/sites/{id}/` | Maydoncha tafsilotlari va tahrirlash |
-
-### Moliya
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/contracts/` | Shartnomalar ro'yxati |
-| POST | `/api/contracts/` | Yangi shartnoma — procurement, admin |
-| GET | `/api/contracts/{id}/` | Shartnoma tafsilotlari |
-| PUT/PATCH | `/api/contracts/{id}/` | Shartnomani tahrirlash — procurement, admin |
-| GET | `/api/invoices/` | Hisob-fakturalar |
-| POST | `/api/invoices/` | Yangi hisob-faktura |
-| GET | `/api/invoices/{id}/` | Hisob-faktura tafsilotlari |
-| PUT/PATCH | `/api/invoices/{id}/` | Hisob-fakturani tahrirlash |
-| GET | `/api/payments/` | To'lovlar ro'yxati |
-| POST | `/api/invoices/{id}/payments/` | To'lov qilish |
-
-### Ishlab chiqarish
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/production-requests/` | Zayavkalar ro'yxati |
-| POST | `/api/production-requests/` | Yangi zayavka |
-| GET | `/api/production-requests/{id}/` | Zayavka tafsilotlari |
-| PUT/PATCH | `/api/production-requests/{id}/` | Zayavkani tahrirlash |
-
-### Murojaatlar (Ticket)
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/tickets/` | Murojaatlar ro'yxati |
-| POST | `/api/tickets/` | Yangi murojaat |
-| GET | `/api/tickets/export/` | Murojaatlarni CSV formatida yuklab olish |
-| GET | `/api/tickets/{id}/` | Murojaat tafsilotlari |
-| PUT/PATCH | `/api/tickets/{id}/` | Murojaatni tahrirlash |
-
-### Manzillar
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/addresses/` | Manzillar ro'yxati |
-| POST | `/api/addresses/` | Yangi manzil |
-| GET | `/api/addresses/{id}/` | Manzil tafsilotlari |
-| PUT/PATCH | `/api/addresses/{id}/` | Manzilni tahrirlash |
-| DELETE | `/api/addresses/{id}/` | Manzilni o'chirish |
-
-### Dashboard va Bildirishnomalar
-
-| Metod | Endpoint | Tavsif |
-|-------|----------|--------|
-| GET | `/api/dashboard/` | Umumiy statistika |
-| GET | `/api/analytics/overview/` | Analitik ko'rsatkichlar |
-| GET | `/api/notifications/` | Bildirishnomalar ro'yxati |
-| POST | `/api/notifications/{id}/read/` | O'qilgan deb belgilash |
-| POST | `/api/notifications/read-all/` | Hammasini o'qilgan deb belgilash |
-| GET | `/api/audit-logs/` | Audit loglari |
+Batafsil qoidalar (nima nimaga sabab bo'ladi, qanday tekshiriladi) →
+[`docs/TIZIM.md`](docs/TIZIM.md).
 
 ---
 
-## 🗄 Ma'lumotlar modeli
+## Testlar
 
-### Asosiy entitetlar
-
-```
-User
-├── Branch (sho'ba bo'lim)
-├── ConstructionSite (Qurilish maydonchasi)
-│   └── ProductionRequest (Zayavka)
-│   └── Ticket (Murojaat)
-├── Warehouse (Omborxona)
-│   └── InventoryItem (Inventarizatsiya)
-│       └── StockMovement (Harakat)
-├── Material (Material)
-├── Document (Hujjat)
-│   ├── DocumentFile (Fayl)
-│   ├── Contract (Shartnoma)
-│   └── Invoice (Hisob-faktura)
-│       └── Payment (To'lov)
-├── Supplier (Yetkazib beruvchi)
-│   └── PurchaseOrder (Buyurtma)
-│       └── PurchaseOrderItem
-└── Notification (Bildirishnoma)
-
-Address (Manzil) — mustaqil entitet
-AuditLog — audit yorlig'i
+```bash
+cd backend
+python manage.py test api
 ```
 
+| Fayl | Qamrov |
+|---|---|
+| `api/tests_stock_movements.py` | Ombor harakatlari, satr qulflash, yetarsiz qoldiq (30 test) |
+| `api/tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (45 test) |
+
+`tests_api_contract.py` da har bir tekshiruv **kutilgan** xulqni tasdiqlaydi.
+Yiqilgan test — tuzatilishi kerak bo'lgan xato, testni moslashtirish emas.
+
+Frontendda test runner sozlanmagan.
+
 ---
 
-## 🔐 Xavfsizlik
-
-- **JWT autentifikatsiya** — access va refresh tokenlar
-- **Role-based access** — admin va oddiy foydalanuvchi
-- **CORS** — django-cors-headers orqali konfiguratsiya
-- **API throttling** — DRF throttling sozlamalari
-- **File upload limit** — 10MB max fayl hajmi
-- **Audit logging** — barcha CRUD operatsiyalar yoziladi
-
----
-
-## 📦 Loyiha tuzilishi
+## Loyiha tuzilishi
 
 ```
 e-ombor/
 ├── backend/
-│   ├── api/                    # Asosiy Django app
-│   │   ├── admin.py            # Django admin konfiguratsiya
-│   │   ├── models.py           # Ma'lumotlar modellar
-│   │   ├── serializers.py      # DRF serializatorlar
-│   │   ├── urls.py             # URL route'lar
-│   │   └── views.py            # API Views
-│   ├── e_ombor_backend/        # Project settings
-│   │   ├── settings.py
+│   ├── api/
+│   │   ├── models.py                    # 21 model
+│   │   ├── serializers.py
+│   │   ├── views.py                     # 50 endpoint, rol darvozalari
 │   │   ├── urls.py
-│   │   └── wsgi.py / asgi.py
+│   │   ├── admin.py
+│   │   ├── migrations/
+│   │   ├── management/commands/
+│   │   │   ├── seed_demo_data.py        # demo to'plam
+│   │   │   └── flush_demo_data.py       # tozalash (user/rol/filial qoladi)
+│   │   ├── tests_stock_movements.py
+│   │   └── tests_api_contract.py
+│   ├── e_ombor_backend/                 # settings, urls, wsgi/asgi
 │   ├── manage.py
-│   ├── requirements.txt
-│   ├── .env                    # Maxfiy sozlamalar (gitignore'da)
-│   ├── db.sqlite3              # Ma'lumotlar bazasi
-│   └── venv/                   # Virtual muhit
+│   └── requirements.txt
+├── frontend/
+│   └── src/
+│       ├── api/                         # axios chaqiruvlari + query kalitlari
+│       ├── hooks/                       # TanStack Query hook'lari
+│       ├── pages/                       # domen sahifalari
+│       ├── layouts/                     # Layout, Sidebar, Header
+│       ├── routs/                       # router.tsx, ProtectedRoute
+│       ├── stores/                      # Zustand (authStore)
+│       ├── lib/                         # axios, queryClient, permissions.ts
+│       └── types/
+├── docs/
+│   └── TIZIM.md                         # tizim mantiqi to'liq bayoni
+├── setup_and_run.sh
 └── README.md
 ```
 
 ---
 
-## 🔮 Keyingi bosqichlar
+## Xavfsizlik
 
-- [ ] **Dashboard va rol asosida UI** — boshqaruv paneli, role-based navigatsiya
-- [ ] **Ombor / ta'minot moduli** — to'liq ombor xarakatlari, inventarizatsiya
-- [ ] **Ob'ekt/loyiha kuzatuvi** — qurilish ob'yektlari va analytics
-- [ ] **e-imzo integratsiyasi** — raqamli imzo bilan hujjatlarni tasdiqlash
-- [ ] **1C integratsiyasi** — buxgalteriya tizimi bilan sinxronlash
-- [ ] **Export/Import** — Excel, CSV formatlarida eksport
-- [ ] **Multi-region** — bir nechta mintaqalar qo'llab-quvvatlash
-- [ ] **Docker & CI/CD** — containerizatsiya va avtomatik deploy
+- **JWT** — access 60 daqiqa, refresh 7 kun. Rotatsiya yoqilgan: har
+  `refresh/` chaqiruvi yangi refresh beradi, eskisi blacklistga tushadi.
+  Bir tokenni ikki marta ishlatib bo'lmaydi.
+- **Rolga asoslangan ruxsat** — 8 rol, yozish amallari server tomonda
+  tekshiriladi. Frontenddagi `permissions.ts` faqat UI uchun nusxa,
+  himoya emas.
+- **Filial izolyatsiyasi** — ro'yxat va tafsilot endpointlarida bir xil.
+- **Huquq oshirishdan himoya** — `/auth/register/` orqali rol yoki filial
+  biriktirib bo'lmaydi; profil tahrirlash rolni o'zgartira olmaydi.
+- **Fayl yuklash** — 10MB chegara, faqat `.pdf`, `.xlsx`, `.xls`, `.jpg`,
+  `.jpeg`, `.png`.
+- **Audit logging** — yozish amallari kim/qachon/nima/IP bilan qayd etiladi.
+- **CORS** — `django-cors-headers`, ruxsat etilgan manbalar `settings.py` da.
 
----
-
-## 📝 Rivojlantirish
-
-### Backend testlar
-
-```bash
-cd backend
-python manage.py test
-```
-
-### Django Admin panel
-
-```bash
-# Superuser yaratish
-python manage.py createsuperuser
-
-# Serverni ishga tushirish
-python manage.py runserver
-```
-
-Admin panel: `http://localhost:3000/admin/`
+> Ishlab chiqarishga chiqarishdan oldin: `DEBUG=False`, `ALLOWED_HOSTS` ni
+> aniq belgilash, `SECRET_KEY` ni muhit o'zgaruvchisidan olish va DRF
+> throttling sozlash kerak — hozir bularning hech biri sozlanmagan.
 
 ---
 
-## 📄 Litsenziya
+## Bajarilgan va rejadagi ishlar
+
+- [x] Rol asosidagi dashboard va navigatsiya
+- [x] Hujjat aylanishi — 10 holatli tasdiqlash zanjiri
+- [x] Ombor moduli — kirim/chiqim/ko'chirish, qoldiq nazorati, kam zaxira ogohlantirishi
+- [x] Obyekt va filial kuzatuvi
+- [x] Moliya — shartnoma, hisob-faktura, to'lov zanjiri
+- [x] CSV eksport (hujjat, inventar, murojaat)
+- [x] Audit log va bildirishnomalar
+- [x] API shartnoma testlari (75 test)
+- [ ] Frontend testlari
+- [ ] DRF throttling va production sozlamalari
+- [ ] e-imzo integratsiyasi — raqamli imzo bilan tasdiqlash
+- [ ] 1C integratsiyasi
+- [ ] Excel eksport (hozircha faqat CSV)
+- [ ] Docker & CI/CD
+
+---
+
+## Litsenziya
 
 E-Ombor — tashkilot ichki foydalanish uchun.

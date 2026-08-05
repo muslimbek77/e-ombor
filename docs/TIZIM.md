@@ -26,8 +26,8 @@ SQLite (dev) / PostgreSQL (prod)
 Frontend uch qatlamli: `api/` (axios chaqiruvlari) → `hooks/` (TanStack Query)
 → `pages/`. Har bir domen shu qolipni takrorlaydi.
 
-Backend bitta `api` ilovasidan iborat: `models.py` (20 model), `serializers.py`,
-`views.py` (45 endpoint), `urls.py`.
+Backend bitta `api` ilovasidan iborat: `models.py` (21 model), `serializers.py`,
+`views.py` (50 endpoint), `urls.py`.
 
 ---
 
