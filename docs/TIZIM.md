@@ -100,25 +100,67 @@ bo'lishi mumkin.
 | `prorab` | Prorab — obyektdan zayavka beradi |
 | `branch_manager` | Filial rahbari |
 
+### `is_staff` — admin bo'lishning ikkinchi yo'li
+
+`is_staff` Django'ning standart bayrog'i va `roles` dan **mustaqil** maydon
+(`models.py`, default `False`). `views.py: is_admin()` ikkalasini ham qabul
+qiladi:
+
+```python
+return user.is_staff or bool(ADMIN_ROLES.intersection(user.roles or []))
+```
+
+Ya'ni `roles` bo'sh bo'lsa ham, `is_staff=True` bo'lgan hisob tizimda to'liq
+admin: material qo'shadi, `/users` va audit logga kiradi, barcha filialni
+ko'radi. Bu ataylab shunday — `createsuperuser` bilan yaratilgan birinchi
+hisob rolsiz tug'iladi (`UserManager.create_superuser` `roles=[]` qoldiradi),
+aks holda tizimga hech kim kira olmasdi.
+
+Bayroq faqat ikki yo'l bilan yoqiladi: `createsuperuser`, yoki admin `/users`
+bo'limidan qo'lda bergani. O'zini o'zi ko'tarish yopiq — ro'yxatdan o'tish
+serializerida `is_staff` maydoni umuman yo'q, profil tahrirlashda esa u
+`roles` bilan birga `read_only`. Buni `tests_api_contract.py` tekshiradi:
+prorab o'ziga `{"roles": ["admin"], "is_staff": true}` yuborsa ham hech nima
+o'zgarmaydi.
+
 ### Yozish huquqi matritsasi
 
 O'qish barcha autentifikatsiyadan o'tgan foydalanuvchilarga ochiq (filial
 chegarasi doirasida). Quyidagi jadval **o'zgartirish** huquqini ko'rsatadi.
 Manba: `backend/api/views.py` boshidagi rol to'plamlari.
 
-| Soha | Kim yozadi |
-|---|---|
-| Filial, material, ombor, manzil | `admin` |
-| Yetkazib beruvchi | `admin`, `procurement` |
-| Qurilish obyekti | `admin`, `branch_manager`, `architecture` |
-| Xarid buyurtmasi | `admin`, `procurement` |
-| Shartnoma | `admin`, `procurement` |
-| Hisob-faktura | `admin`, `accountant`, `procurement` |
-| To'lov | `admin`, `accountant` |
-| Ombor harakati va zaxira | `admin`, `warehouse` |
-| Hujjatni arxivlash | `admin`, `procurement`, `branch_manager` |
-| Hujjatni tahrirlash/o'chirish | Muallifi, `admin`, `procurement`, `branch_manager` |
-| Foydalanuvchilar | `admin` |
+`admin` ustuni jadvalda yo'q — `is_admin()` har bir tekshiruvda birinchi
+bo'lib `True` qaytaradi, ya'ni admin hamma katakda ✅.
+
+| Soha | ceo | arxitektura | xaridlar | buxgalter | omborchi | prorab | filial rahbari |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Filial, material, ombor, manzil | — | — | — | — | — | — | — |
+| Yetkazib beruvchi | — | — | ✅ | — | — | — | — |
+| Qurilish obyekti | — | ✅ | — | — | — | — | ✅ |
+| Xarid buyurtmasi | — | — | ✅ | — | — | — | — |
+| Shartnoma | — | — | ✅ | — | — | — | — |
+| Hisob-faktura | — | — | ✅ | ✅ | — | — | — |
+| To'lov | — | — | — | ✅ | — | — | — |
+| Zaxira va ombor harakati | — | — | — | — | ✅ | — | — |
+| Ombor harakatini o'chirish | — | — | — | — | — | — | — |
+| Hujjat yaratish | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Hujjatni tahrirlash/o'chirish | muallif | muallif | ✅ | muallif | muallif | muallif | ✅ |
+| Hujjatni arxivlash | — | — | ✅ | — | — | — | ✅ |
+| Zayavka va murojaat | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Foydalanuvchilar | — | — | — | — | — | — | — |
+
+*"muallif" — faqat o'zi yaratgan hujjatni; begonasini emas.*
+
+Uch qator izoh talab qiladi. **Hujjat yaratish** ochiq: oqim shu bilan
+boshlanadi va uni kim boshlashi keyingi bosqichdagi rol tekshiruvi bilan
+ajratiladi, yaratish huquqi bilan emas. **Ombor harakati** esa umuman
+o'chirilmaydi: `urls.py` da faqat `stock-movements/` ro'yxat-yaratish yo'li
+bor, tafsilot endpointi yo'q. Ya'ni qayd kiritilgach, uni hech kim — hatto
+admin ham — API orqali o'chira olmaydi. Xato kiritilgan harakat teskari
+harakat bilan tuzatiladi, tarix esa buzilmaydi. **`admin` ustuni yo'qligi**
+esa hujjat qatorida bitta nozik joyni yashiradi: admin `DOCUMENT_MANAGE_ROLES`
+ga kirgani uchun begona hujjatni ham tahrirlaydi, "muallif" cheklovi unga
+tegishli emas.
 
 Frontend `src/lib/permissions.ts` da shu to'plamlarning nusxasini saqlaydi.
 Bu **xavfsizlik chorasi emas** — server har bir so'rovni mustaqil tekshiradi.
@@ -177,7 +219,32 @@ stateDiagram-v2
     closed --> [*]
 ```
 
-`admin` har qanday o'tishni bajara oladi.
+Xuddi shu qoidalar jadval ko'rinishida — `WORKFLOW_RULES` lug'atining
+to'g'ridan-to'g'ri aksi:
+
+| Joriy holat | Amal | Keyingi holat | Kim bajaradi |
+|---|---|---|---|
+| `created` | `submit` | `architecture` | prorab, xaridlar |
+| `architecture` | `approve` | `ceo` | arxitektura |
+| `architecture` | `reject` | `rejected` | arxitektura |
+| `ceo` | `approve` | `approved` | ceo |
+| `ceo` | `reject` | `rejected` | ceo |
+| `approved` | `advance` | `contract` | xaridlar |
+| `approved` | `reject` | `rejected` | xaridlar |
+| `contract` | `advance` | `payment` | xaridlar, buxgalter |
+| `contract` | `reject` | `rejected` | xaridlar, buxgalter |
+| `payment` | `advance` | `delivering` | buxgalter |
+| `payment` | `reject` | `rejected` | buxgalter |
+| `delivering` | `advance` | `received` | omborchi |
+| `received` | `close` | `closed` | omborchi, prorab |
+| `rejected` | `reopen` | `created` | xaridlar, prorab |
+
+`admin` har qanday o'tishni bajara oladi — jadvalda alohida ko'rsatilmagan.
+
+Jadvalda yo'q narsa ham ma'noli: `delivering` va `received` holatlarida
+`reject` yo'q. Tovar yo'lga chiqqach yoki omborga kirgach hujjatni rad etib
+bo'lmaydi — bunday holat qoldiqni hujjat holatidan ajratib yuborardi.
+`closed` esa yakuniy: undan hech qayerga o'tilmaydi.
 
 Qoidalar:
 
