@@ -3,6 +3,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { useAddresses, useCreateAddress } from "../../hooks/useAddresses";
 import { AddressCard } from "./AddressCard";
 import { AddressForm } from "./AddressForm";
+import { REFERENCE_DATA_ROLES, useHasRole } from "../../lib/permissions";
 
 export default function AddressesPage() {
   const [query, setQuery] = useState("");
@@ -10,6 +11,7 @@ export default function AddressesPage() {
   const deferredQuery = useDeferredValue(query);
   const { data: addresses = [], isPending, isError } = useAddresses();
   const createAddress = useCreateAddress();
+  const canManageAddresses = useHasRole(REFERENCE_DATA_ROLES);
 
   const filteredAddresses = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase();
@@ -26,9 +28,11 @@ export default function AddressesPage() {
             <p className="mt-0.5 text-sm text-gray-400">{isPending ? "Yuklanmoqda..." : `${filteredAddresses.length} ta manzil`}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
-              <Plus size={16} /> Manzil qo'shish
-            </button>
+            {canManageAddresses && (
+              <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
+                <Plus size={16} /> Manzil qo'shish
+              </button>
+            )}
             <label className="relative">
               <span className="sr-only">Manzillarni qidirish</span>
               <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />

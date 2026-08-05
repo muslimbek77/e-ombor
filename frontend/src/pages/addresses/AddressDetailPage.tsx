@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAddress, useDeleteAddress, useUpdateAddress } from "../../hooks/useAddresses";
 import { AddressForm } from "./AddressForm";
+import { REFERENCE_DATA_ROLES, useHasRole } from "../../lib/permissions";
 
 export default function AddressDetailPage() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function AddressDetailPage() {
   const { data: address, isPending, isError } = useAddress(addressId);
   const updateAddress = useUpdateAddress();
   const deleteAddress = useDeleteAddress();
+  const canManageAddresses = useHasRole(REFERENCE_DATA_ROLES);
 
   if (!Number.isInteger(addressId) || addressId < 1) return <DetailState>Manzil ID noto'g'ri.</DetailState>;
   if (isPending) return <DetailState>Yuklanmoqda...</DetailState>;
@@ -41,12 +43,16 @@ export default function AddressDetailPage() {
               <h1 className="text-2xl font-bold text-gray-900">{address.city}</h1>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-                <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
-              </button>
-              <button type="button" onClick={handleDelete} disabled={deleteAddress.isPending} className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
-                <Trash2 size={15} /> O'chirish
-              </button>
+              {canManageAddresses && (
+                <>
+                  <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                    <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
+                  </button>
+                  <button type="button" onClick={handleDelete} disabled={deleteAddress.isPending} className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                    <Trash2 size={15} /> O'chirish
+                  </button>
+                </>
+              )}
             </div>
           </div>
 

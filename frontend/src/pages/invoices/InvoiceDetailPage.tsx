@@ -10,6 +10,7 @@ import { formatDateTime } from "../tickets/ticketUtils";
 import { formatBudget, formatDate } from "../objects/siteUtils";
 import type { InvoiceUpdatePayload } from "../../types/invoice";
 import type { PaymentCreatePayload } from "../../types/payment";
+import { INVOICE_ROLES, PAYMENT_ROLES, useHasRole } from "../../lib/permissions";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -20,12 +21,15 @@ export default function InvoiceDetailPage() {
   const updateInvoice = useUpdateInvoice();
   const { data: payments = [], isPending: isPaymentsPending } = useInvoicePayments(invoiceId);
   const createPayment = useCreatePayment();
+  const canManageInvoices = useHasRole(INVOICE_ROLES);
+  const canRegisterPayments = useHasRole(PAYMENT_ROLES);
 
   if (!Number.isInteger(invoiceId) || invoiceId < 1) return <DetailState>Invoice ID noto'g'ri.</DetailState>;
   if (isPending) return <DetailState>Yuklanmoqda...</DetailState>;
   if (isError || !invoice) return <DetailState>Invoiceni yuklashda xatolik yuz berdi.</DetailState>;
 
-  const canAddPayment = invoice.payment_status !== "paid";
+  // To'lov qayd etish serverda ham buxgalter/adminga cheklangan (views.py: PaymentWrite).
+  const canAddPayment = canRegisterPayments && invoice.payment_status !== "paid";
 
   return (
     <main className="min-h-full bg-gray-50 p-6">
@@ -42,9 +46,11 @@ export default function InvoiceDetailPage() {
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{invoice.document_doc_number}</span>
               </div>
             </div>
-            <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
-            </button>
+            {canManageInvoices && (
+              <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
+              </button>
+            )}
           </div>
           {updateInvoice.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">O'zgarishlarni saqlab bo'lmadi.</p>}
           {isEditing ? (

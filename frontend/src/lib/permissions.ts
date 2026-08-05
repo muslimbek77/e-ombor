@@ -15,15 +15,27 @@ export const ARCHIVE_ROLES: UserRole[] = ["admin", "procurement", "branch_manage
 export const STOCK_MOVEMENT_ROLES: UserRole[] = ["admin", "warehouse"];
 export const PURCHASE_ORDER_ROLES: UserRole[] = ["admin", "procurement"];
 export const CONTRACT_ROLES: UserRole[] = ["admin", "procurement"];
+export const SUPPLIER_ROLES: UserRole[] = ["admin", "procurement"];
+export const INVOICE_ROLES: UserRole[] = ["admin", "accountant", "procurement"];
+export const PAYMENT_ROLES: UserRole[] = ["admin", "accountant"];
+export const SITE_ROLES: UserRole[] = ["admin", "branch_manager", "architecture"];
+export const DOCUMENT_MANAGE_ROLES: UserRole[] = ["admin", "procurement", "branch_manager"];
+
+/**
+ * Ma'lumotnoma bazasi — filial, material, ombor, manzil. Ko'rish hammaga
+ * ochiq, o'zgartirish faqat adminga (views.py: AdminOnlyWrite).
+ */
+export const REFERENCE_DATA_ROLES: UserRole[] = ["admin"];
 
 /**
  * Qaysi bo'limni qaysi rol ko'radi. Kalit — nav item'ning `href`i.
  * Ro'yxatda yo'q manzil hamma rolga ochiq (masalan `/`, `/profile`, `/settings`).
  * Admin (yoki `is_staff`) hamma narsani ko'radi — bu alohida tekshiriladi.
  *
- * Bu jadval mahsulot qarori, backend cheklovi emas: faqat `/users` va
- * `/audit-logs` serverda ham qattiq yopilgan, qolganlari menyuni rolga
- * moslash uchun. O'zgartirish kerak bo'lsa — faqat shu joyni tahrirlash yetarli.
+ * Bu jadval bo'lim KO'RINISHI haqida — mahsulot qarori, backend cheklovi emas
+ * (`/users` va `/audit-logs` bundan istisno, ular serverda ham yopiq).
+ * Bo'lim ichida nimani O'ZGARTIRISH mumkinligi esa yuqoridagi rol
+ * to'plamlari bilan aniqlanadi va serverda ham xuddi shunday tekshiriladi.
  */
 export const PATH_ROLES: Record<string, UserRole[]> = {
   "/purchases": ["ceo", "procurement", "accountant", "branch_manager"],

@@ -17,6 +17,7 @@ import {
 } from "../../hooks/useMaterials";
 import { formatDate } from "../objects/siteUtils";
 import { MaterialForm } from "./MaterialForm";
+import { REFERENCE_DATA_ROLES, useHasRole } from "../../lib/permissions";
 
 export default function MaterialDetailPage() {
   const { id } = useParams();
@@ -26,6 +27,7 @@ export default function MaterialDetailPage() {
   const { data: material, isPending, isError } = useMaterial(materialId);
   const updateMaterial = useUpdateMaterial();
   const deleteMaterial = useDeleteMaterial();
+  const canManageMaterials = useHasRole(REFERENCE_DATA_ROLES);
   if (!Number.isInteger(materialId) || materialId < 1)
     return <DetailState>Material ID noto‘g‘ri.</DetailState>;
   if (isPending) return <DetailState>Yuklanmoqda...</DetailState>;
@@ -100,21 +102,25 @@ export default function MaterialDetailPage() {
               <p className="mt-1 text-sm text-gray-500">Kod: {material.code}</p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsEditing((value) => !value)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleteMaterial.isPending}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                <Trash2 size={15} /> O‘chirish
-              </button>
+              {canManageMaterials && (
+                <>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing((value) => !value)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleteMaterial.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                >
+                  <Trash2 size={15} /> O‘chirish
+                </button>
+                </>
+              )}
             </div>
           </div>
           {isEditing ? (

@@ -5,6 +5,8 @@ export interface AuditLog {
   action: string;
   model_name: string;
   object_id: number | null;
+  /** Obyektning o'qiladigan nomi; o'chirilgan obyektlarda `null` — o'rniga id ko'rsatiladi. */
+  object_label: string | null;
   details: Record<string, unknown> | null;
   ip_address: string | null;
   created_at: string;
