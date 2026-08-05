@@ -11,7 +11,8 @@ from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import (
     Address,
@@ -240,21 +241,35 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class CustomTokenRefreshView(APIView):
-    """JWT Refresh token."""
+    """
+    JWT refresh.
+
+    Ishni simplejwt'ning `TokenRefreshSerializer`iga topshiramiz — faqat shunda
+    SIMPLE_JWT dagi ROTATE_REFRESH_TOKENS va BLACKLIST_AFTER_ROTATION haqiqatan
+    ishlaydi (qo'lda yig'ilgan javob ularni jimgina chetlab o'tardi va bitta
+    refresh token 7 kun davomida amal qilaverardi). O'zimizga faqat xato
+    matnlari qoladi.
+    """
+
     permission_classes = (permissions.AllowAny,)
-    
+
     def post(self, request):
+        if not request.data.get('refresh'):
+            return Response(
+                {'error': 'refresh token topilmadi'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = TokenRefreshSerializer(data=request.data)
         try:
-            refresh = RefreshToken(request.data['refresh'])
-            data = {
-                'access': str(refresh.access_token),
-                'refresh': str(refresh),
-            }
-            return Response(data, status=status.HTTP_200_OK)
-        except TokenError as e:
-            return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-        except KeyError:
-            return Response({'error': 'refresh token topilmadi'}, status=status.HTTP_400_BAD_REQUEST)
+            serializer.is_valid(raise_exception=True)
+        except (TokenError, InvalidToken):
+            return Response(
+                {'error': "Refresh token yaroqsiz yoki muddati tugagan"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):

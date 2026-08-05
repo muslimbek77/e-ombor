@@ -2,6 +2,7 @@ import axios from "axios";
 import type { AxiosError, AxiosRequestConfig } from "axios";
 
 import { refresh } from "../api/auth";
+import type { RefreshResponse } from "../api/auth";
 import { useAuthStore } from "../stores/authStore";
 
 interface RetryRequestConfig extends AxiosRequestConfig {
@@ -13,7 +14,7 @@ const api = axios.create({
   headers: { "ngrok-skip-browser-warning": "true" },
 });
 
-let refreshPromise: Promise<{ access: string }> | null = null;
+let refreshPromise: Promise<RefreshResponse> | null = null;
 
 api.interceptors.request.use(
   (config) => {
@@ -76,11 +77,21 @@ api.interceptors.response.use(
 
       refreshPromise = null;
 
-      if (useAuthStore.getState().refreshToken !== refreshToken) {
+      // Refresh davomida chiqib ketilgan yoki boshqa hisobga kirilgan bo'lsa,
+      // eskirgan tokenni qo'llamaymiz. `data.refresh`ga tenglik — bir vaqtda
+      // ketgan boshqa so'rov shu javobni allaqachon saqlab ulgurgan holat.
+      const current = useAuthStore.getState().refreshToken;
+      if (current !== refreshToken && current !== data.refresh) {
         return Promise.reject(error);
       }
 
-      useAuthStore.getState().setAccessToken(data.access);
+      // Rotatsiya yoqilgan bo'lsa eski refresh token blacklist qilinadi —
+      // yangisini saqlamasak, keyingi yangilashda tizimdan uchib chiqamiz.
+      if (data.refresh) {
+        useAuthStore.getState().setTokens(data.access, data.refresh);
+      } else {
+        useAuthStore.getState().setAccessToken(data.access);
+      }
 
       originalRequest.headers = originalRequest.headers ?? {};
       originalRequest.headers.Authorization = `Bearer ${data.access}`;

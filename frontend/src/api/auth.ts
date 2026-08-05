@@ -23,8 +23,16 @@ export const login = async (payload: LoginPayload) => {
   return data;
 };
 
-export const refresh = async (refreshToken: string) => {
-  const { data } = await authApi.post("/auth/refresh/", {
+// Server rotatsiya yoqilganda yangi refresh tokenni ham qaytaradi (SIMPLE_JWT
+// ROTATE_REFRESH_TOKENS) va eskisini blacklist qiladi — shuning uchun javobdagi
+// `refresh`ni albatta saqlash kerak, aks holda keyingi yangilash 401 beradi.
+export interface RefreshResponse {
+  access: string;
+  refresh?: string;
+}
+
+export const refresh = async (refreshToken: string): Promise<RefreshResponse> => {
+  const { data } = await authApi.post<RefreshResponse>("/auth/refresh/", {
     refresh: refreshToken,
   });
 
