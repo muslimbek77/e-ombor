@@ -22,3 +22,31 @@ export interface UsersResponse {
   previous: string | null;
   results: AppUser[];
 }
+
+export type UserRole = "admin" | "ceo" | "architecture" | "procurement" | "accountant" | "warehouse" | "prorab" | "branch_manager";
+
+export interface UserCreatePayload {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  stir_inn: string;
+  roles: UserRole[];
+  branch: number | null;
+  is_active: boolean;
+  is_staff: boolean;
+}
+
+export interface UserUpdatePayload {
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  stir_inn: string;
+  roles: UserRole[];
+  branch: number | null;
+  is_active: boolean;
+  is_staff: boolean;
+  password?: string;
+}

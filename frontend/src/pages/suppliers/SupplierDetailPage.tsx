@@ -19,8 +19,8 @@ export default function SupplierDetailPage() {
   if (isError || !supplier) return <DetailState>Supplierni yuklashda xatolik yuz berdi.</DetailState>;
 
   function handleDelete() {
-    if (!window.confirm(`“${supplier.name}” supplierini o‘chirmoqchimisiz?`)) return;
-    deleteSupplier.mutate(supplier.id, { onSuccess: () => navigate("/suppliers", { replace: true }) });
+    if (!window.confirm(`“${supplier!.name}” supplierini o‘chirmoqchimisiz?`)) return;
+    deleteSupplier.mutate(supplier!.id, { onSuccess: () => navigate("/suppliers", { replace: true }) });
   }
 
   return (

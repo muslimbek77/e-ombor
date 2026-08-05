@@ -5,6 +5,7 @@ Django settings for e_ombor_backend project.
 import os
 from pathlib import Path
 from datetime import timedelta
+from corsheaders.defaults import default_headers
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -150,7 +151,13 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://localhost:3000',
+    'https://frontend-tau-blush-76.vercel.app',
+    'https://e-ombor-uz.vercel.app',
 ]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^https://frontend-.*-juniordilmurodov9979s-projects\.vercel\.app$',
+]
+CORS_ALLOW_HEADERS = list(default_headers) + ['ngrok-skip-browser-warning']
 CORS_ALLOW_CREDENTIALS = True
 
 # API Documentation

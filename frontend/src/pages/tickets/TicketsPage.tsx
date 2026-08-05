@@ -1,6 +1,6 @@
-import { Plus, Search, X } from "lucide-react";
+import { Download, Plus, Search, X } from "lucide-react";
 import { useDeferredValue, useMemo, useState } from "react";
-import { useCreateTicket, useTickets } from "../../hooks/useTickets";
+import { useCreateTicket, useExportTickets, useTickets } from "../../hooks/useTickets";
 import { TicketCard } from "./TicketCard";
 import { TicketForm } from "./TicketForm";
 import type { TicketCreatePayload } from "../../types/ticket";
@@ -22,6 +22,7 @@ export default function TicketsPage() {
   const deferredQuery = useDeferredValue(query);
   const { data: tickets = [], isPending, isError } = useTickets();
   const createTicket = useCreateTicket();
+  const exportTickets = useExportTickets();
 
   const filteredTickets = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase();
@@ -56,8 +57,18 @@ export default function TicketsPage() {
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={() => exportTickets.mutate(statusFilter === "all" ? undefined : { status: statusFilter })}
+              disabled={exportTickets.isPending}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download size={15} /> {exportTickets.isPending ? "Yuklab olinmoqda..." : "Eksport"}
+            </button>
           </div>
         </header>
+
+        {exportTickets.isError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">Murojaatlarni eksport qilib bo'lmadi.</p>}
 
         {isPending && <PageState>Yuklanmoqda...</PageState>}
         {isError && <PageState className="text-red-500">Murojaatlarni yuklashda xatolik yuz berdi</PageState>}

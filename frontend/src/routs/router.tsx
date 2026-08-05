@@ -14,6 +14,8 @@ import WarehousesPage from "../pages/warehouses/WarehousesPage";
 import WarehouseDetailPage from "../pages/warehouses/WarehouseDetailPage";
 import ShartnomalarPage from "../pages/shartnomalar/ShartnomalarPage";
 import ShartnomaDetailPage from "../pages/shartnomalar/ShartnomaDetailPage";
+import InventoryPage from "../pages/inventory/InventoryPage";
+import InventoryDetailPage from "../pages/inventory/InventoryDetailPage";
 import MaterialsPage from "../pages/materials/MaterialsPage";
 import MaterialDetailPage from "../pages/materials/MaterialDetailPage";
 import NotificationsPage from "../pages/notifications/NotificationsPage";
@@ -23,10 +25,20 @@ import TicketsPage from "../pages/tickets/TicketsPage";
 import TicketDetailPage from "../pages/tickets/TicketDetailPage";
 import InvoicesPage from "../pages/invoices/InvoicesPage";
 import InvoiceDetailPage from "../pages/invoices/InvoiceDetailPage";
+import UsersPage from "../pages/users/UsersPage";
+import UserDetailPage from "../pages/users/UserDetailPage";
+import DocumentsPage from "../pages/documents/DocumentsPage";
+import DocumentDetailPage from "../pages/documents/DocumentDetailPage";
+import ProductionRequestsPage from "../pages/production-requests/ProductionRequestsPage";
+import ProductionRequestDetailPage from "../pages/production-requests/ProductionRequestDetailPage";
+import AuditLogsPage from "../pages/audit-logs/AuditLogsPage";
+import SettingsPage from "../pages/settings/SettingsPage";
+import AddressesPage from "../pages/addresses/AddressesPage";
+import AddressDetailPage from "../pages/addresses/AddressDetailPage";
+import ReportsPage from "../pages/reports/ReportsPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const accessToken = useAuthStore((state) => state.accessToken);
-  console.log(accessToken);
 
   if (!accessToken) {
     return <Navigate to="/login" replace />;
@@ -54,7 +66,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/settings",
-        element: <div>Settings Page</div>,
+        element: <SettingsPage />,
       },
       {
         path: "/objects",
@@ -79,6 +91,14 @@ const router = createBrowserRouter([
       {
         path: "/warehouse/:id",
         element: <WarehouseDetailPage />,
+      },
+      {
+        path: "/inventory",
+        element: <InventoryPage />,
+      },
+      {
+        path: "/inventory/:id",
+        element: <InventoryDetailPage />,
       },
       {
         path: "/contracts",
@@ -123,6 +143,46 @@ const router = createBrowserRouter([
       {
         path: "/invoices/:id",
         element: <InvoiceDetailPage />,
+      },
+      {
+        path: "/users",
+        element: <UsersPage />,
+      },
+      {
+        path: "/users/:id",
+        element: <UserDetailPage />,
+      },
+      {
+        path: "/documents",
+        element: <DocumentsPage />,
+      },
+      {
+        path: "/documents/:id",
+        element: <DocumentDetailPage />,
+      },
+      {
+        path: "/production-requests",
+        element: <ProductionRequestsPage />,
+      },
+      {
+        path: "/production-requests/:id",
+        element: <ProductionRequestDetailPage />,
+      },
+      {
+        path: "/audit-logs",
+        element: <AuditLogsPage />,
+      },
+      {
+        path: "/addresses",
+        element: <AddressesPage />,
+      },
+      {
+        path: "/addresses/:id",
+        element: <AddressDetailPage />,
+      },
+      {
+        path: "/reports",
+        element: <ReportsPage />,
       },
 
       {

@@ -4,14 +4,15 @@ import { persist } from "zustand/middleware";
 interface User {
   id: number;
   email: string;
+  first_name: string;
   last_name: string;
   full_name: string;
   phone: string;
   stir_inn: string;
   roles: string[];
-  branch: null;
-  is_active: true;
-  is_staff: false;
+  branch: number | null;
+  is_active: boolean;
+  is_staff: boolean;
   last_login: string;
   created_at: string;
   updated_at: string;
@@ -55,16 +56,12 @@ export const useAuthStore = create<AuthState>()(
           user,
         }),
 
-      logout: () => {
-        console.log("Logout called");
+      logout: () =>
         set({
           accessToken: null,
           refreshToken: null,
           user: null,
-        });
-
-        console.log("After logout:", useAuthStore.getState());
-      },
+        }),
     }),
     {
       name: "auth-storage",

@@ -1,15 +1,21 @@
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 
-import { useContracts } from "../../hooks/useContracts";
+import { useContracts, useCreateContract } from "../../hooks/useContracts";
 import { ContractCard } from "./ShartnomaContractCard";
+import { ContractForm } from "./ShartnomaForm";
+import type { ContractPayload } from "../../types/shartnoma";
+import { CONTRACT_ROLES, useHasRole } from "../../lib/permissions";
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 const ShartnomalarPage = () => {
   const [query, setQuery] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const { data: contracts = [], isLoading: loading, error } = useContracts();
+  const createContract = useCreateContract();
+  const canManageContracts = useHasRole(CONTRACT_ROLES);
 
   const filtered = contracts.filter((c) => {
     if (query.trim() === "") return true;
@@ -32,18 +38,29 @@ const ShartnomalarPage = () => {
             </p>
           </div>
 
-          <div className="relative">
-            <Search
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Qidirish..."
-              className="pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 w-56"
-            />
+          <div className="flex items-center gap-2">
+            {canManageContracts && (
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
+              >
+                <Plus size={16} /> Shartnoma qo'shish
+              </button>
+            )}
+            <div className="relative">
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Qidirish..."
+                className="pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 w-56"
+              />
+            </div>
           </div>
         </div>
 
@@ -73,6 +90,26 @@ const ShartnomalarPage = () => {
           </div>
         )}
       </div>
+
+      {isCreateOpen && (
+        <div role="dialog" aria-modal="true" aria-labelledby="create-contract-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <h2 id="create-contract-title" className="text-xl font-bold text-gray-900">Yangi shartnoma</h2>
+                <p className="mt-1 text-sm text-gray-500">Shartnoma ma'lumotlarini kiriting.</p>
+              </div>
+              <button type="button" aria-label="Yopish" onClick={() => setIsCreateOpen(false)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"><X size={18} /></button>
+            </div>
+            {createContract.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">Shartnomani saqlab bo'lmadi. Ma'lumotlarni tekshirib, qayta urinib ko'ring.</p>}
+            <ContractForm
+              isSubmitting={createContract.isPending}
+              onCancel={() => setIsCreateOpen(false)}
+              onSubmit={(payload: ContractPayload) => createContract.mutate(payload, { onSuccess: () => setIsCreateOpen(false) })}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

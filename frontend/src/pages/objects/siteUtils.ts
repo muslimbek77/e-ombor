@@ -6,7 +6,7 @@ export function formatBudget(value: string): string {
     : `${new Intl.NumberFormat("uz-UZ").format(amount)} so'm`;
 }
 
-export function formatDate(value: string): string {
+export function formatDate(value?: string | null): string {
   if (!value) return "—";
 
   const date = new Date(value);

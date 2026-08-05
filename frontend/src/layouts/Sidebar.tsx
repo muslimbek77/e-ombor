@@ -1,111 +1,8 @@
-import { useState } from "react";
-import {
-  LayoutDashboard,
-  Building2,
-  ShoppingCart,
-  FileText,
-  Users,
-  Package,
-  Layers,
-  Calculator,
-  FolderOpen,
-  BarChart2,
-  MessageSquare,
-  Bell,
-  UserCog,
-  Settings,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface NavItem {
-  label: string;
-  icon: React.ReactNode;
-  href: string;
-  badge?: number;
-}
-
-interface SidebarProps {
-  activeItem?: string;
-  onNavigate?: (href: string) => void;
-}
-
-// ── Nav groups ─────────────────────────────────────────────────────────────────
-
-const ASOSIY: NavItem[] = [
-  {
-    label: "Boshqaruv paneli",
-    icon: <LayoutDashboard size={18} />,
-    href: "/",
-  },
-  {
-    label: "Qurilish obyektlari",
-    icon: <Building2 size={18} />,
-    href: "/objects",
-  },
-  {
-    label: "Xaridlar",
-    icon: <ShoppingCart size={18} />,
-    href: "/purchases",
-  },
-  {
-    label: "Shartnomalar",
-    icon: <FileText size={18} />,
-    href: "/contracts",
-  },
-  {
-    label: "Supplierlar",
-    icon: <Users size={18} />,
-    href: "/suppliers",
-  },
-  {
-    label: "Ombor",
-    icon: <Package size={18} />,
-    href: "/warehouse",
-  },
-  {
-    label: "Materiallar",
-    icon: <Layers size={18} />,
-    href: "/materials",
-  },
-  {
-    label: "Hisob-fakturalar",
-    icon: <Calculator size={18} />,
-    href: "/invoices",
-  },
-  {
-    label: "Hujjatlar",
-    icon: <FolderOpen size={18} />,
-    href: "/documents",
-  },
-  {
-    label: "Hisobotlar",
-    icon: <BarChart2 size={18} />,
-    href: "/reports",
-  },
-  {
-    label: "Murojaatlar",
-    icon: <MessageSquare size={18} />,
-    href: "/tickets",
-  },
-  {
-    label: "Bildirishnomalar",
-    icon: <Bell size={18} />,
-    href: "/notifications",
-  },
-  {
-    label: "Foydalanuvchilar",
-    icon: <UserCog size={18} />,
-    href: "/users",
-  },
-  {
-    label: "Sozlamalar",
-    icon: <Settings size={18} />,
-    href: "/settings",
-  },
-];
+import { matchNavHref, visibleNavItems } from "./navItems";
+import type { NavItem } from "./navItems";
+import { useAuthStore } from "../stores/authStore";
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -221,26 +118,6 @@ function NavLink({
   );
 }
 
-function SystemStatus() {
-  return (
-    <div className="mx-4 mb-4">
-      <div className="flex items-center gap-2">
-        {/* Pulsing green dot */}
-        <div className="relative flex-shrink-0">
-          <div className="w-2 h-2 rounded-full bg-green-500" />
-          <div className="absolute inset-0 w-2 h-2 rounded-full bg-green-400 animate-ping opacity-60" />
-        </div>
-        <div>
-          <div className="text-white text-xs font-semibold">Tizim holati</div>
-          <div className="text-gray-400 text-xs">
-            Barcha tizimlar ishlayapti
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function FooterCopyright() {
   return (
     <div className="px-4 pb-4">
@@ -253,15 +130,14 @@ function FooterCopyright() {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export default function Sidebar({ activeItem = "/" }: SidebarProps) {
-  const [active, setActive] = useState(activeItem);
+export default function Sidebar() {
+  const { pathname } = useLocation();
+  const active = matchNavHref(pathname);
   const navigate = useNavigate();
   const { data: notifications } = useNotifications();
   const unreadCount = (notifications ?? []).filter((n) => !n.is_read).length;
-  const handleClick = (href: string) => {
-    setActive(href);
-    navigate(href);
-  };
+  const user = useAuthStore((state) => state.user);
+  const navItems = visibleNavItems(user);
 
   return (
     <aside
@@ -291,12 +167,12 @@ export default function Sidebar({ activeItem = "/" }: SidebarProps) {
 
       {/* ── Nav items ── */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-1 pb-2 space-y-0.5 scrollbar-thin">
-        {ASOSIY.map((item) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.href}
             item={item.href === "/notifications" && unreadCount > 0 ? { ...item, badge: unreadCount } : item}
             isActive={active === item.href}
-            onClick={() => handleClick(item.href)}
+            onClick={() => navigate(item.href)}
           />
         ))}
       </nav>
