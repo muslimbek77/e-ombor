@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { useAuthStore } from "../../stores/authStore";
 import { useChangePassword } from "../../hooks/auth/useChangePassword";
+import { useLogout } from "../../hooks/auth/useLogout";
 import {
   User,
   Mail,
@@ -284,8 +285,7 @@ function ChangePasswordCard() {
 
 const ProfilePage = () => {
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
-  const navigate = useNavigate();
+  const logoutMutation = useLogout();
   const { hash } = useLocation();
 
   // Header menyusidagi "Parolni o'zgartirish" /profile#parol ga olib keladi —
@@ -298,8 +298,8 @@ const ProfilePage = () => {
   }, [hash]);
 
   const handleLogout = () => {
-    logout();
-    navigate("/login", { replace: true });
+    if (logoutMutation.isPending) return;
+    logoutMutation.mutate();
   };
 
   if (!user) {
@@ -401,7 +401,8 @@ const ProfilePage = () => {
               {/* Logout button */}
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-colors flex-shrink-0 mb-1 cursor-pointer"
+                disabled={logoutMutation.isPending}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-colors flex-shrink-0 mb-1 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ background: "#fef2f2", color: "#dc2626" }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "#fee2e2";
@@ -410,8 +411,12 @@ const ProfilePage = () => {
                   e.currentTarget.style.background = "#fef2f2";
                 }}
               >
-                <LogOut size={14} />
-                Chiqish
+                {logoutMutation.isPending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <LogOut size={14} />
+                )}
+                {logoutMutation.isPending ? "Chiqilmoqda..." : "Chiqish"}
               </button>
             </div>
           </div>

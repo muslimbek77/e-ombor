@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, ChevronDown, KeyRound, LogOut, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications";
+import { useLogout } from "../hooks/auth/useLogout";
 import { ASOSIY, matchNavHref } from "./navItems";
 import { canAccessPath } from "../lib/permissions";
 import { useAuthStore } from "../stores/authStore";
@@ -149,7 +150,7 @@ function MenuItem({
 function UserMenu() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
+  const logoutMutation = useLogout();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -189,9 +190,9 @@ function UserMenu() {
   };
 
   const handleLogout = () => {
+    if (logoutMutation.isPending) return;
     setOpen(false);
-    logout();
-    navigate("/login", { replace: true });
+    logoutMutation.mutate();
   };
 
   return (

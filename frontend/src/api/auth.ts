@@ -31,6 +31,16 @@ export const refresh = async (refreshToken: string) => {
   return data;
 };
 
+// Refresh token'ni serverda blacklist qiladi. Bu bo'lmasa, chiqilgandan keyin
+// ham o'g'irlangan token bilan yangi access token olish mumkin bo'lib qolaveradi.
+export const logout = async (refreshToken: string) => {
+  const { data } = await api.post<{ message: string }>("/auth/logout/", {
+    refresh: refreshToken,
+  });
+
+  return data;
+};
+
 // Authenticated request — goes through the shared `api` instance, not `authApi`.
 export const changePassword = async (payload: ChangePasswordPayload) => {
   const { data } = await api.post<{ message: string }>(
