@@ -152,6 +152,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://localhost:3000',
     'https://frontend-tau-blush-76.vercel.app',
+    'https://e-ombor-uz.vercel.app',
 ]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r'^https://frontend-.*-juniordilmurodov9979s-projects\.vercel\.app$',
