@@ -13,6 +13,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDeleteSite, useSite, useUpdateSite } from "../../hooks/useObjects";
 import { formatBudget, formatDate, getStatusStyle } from "./siteUtils";
 import { SiteForm } from "./SiteForm";
+import { SITE_ROLES, useHasRole } from "../../lib/permissions";
 
 export default function ObjectDetailPage() {
   const { id } = useParams();
@@ -22,6 +23,7 @@ export default function ObjectDetailPage() {
   const { data: site, isPending, isError } = useSite(siteId);
   const updateSite = useUpdateSite();
   const deleteSite = useDeleteSite();
+  const canManageSites = useHasRole(SITE_ROLES);
 
   if (!Number.isInteger(siteId) || siteId < 1)
     return <DetailState>Obyekt ID noto‘g‘ri.</DetailState>;
@@ -60,21 +62,25 @@ export default function ObjectDetailPage() {
               >
                 {site.status_display}
               </span>
-              <button
-                type="button"
-                onClick={() => setIsEditing((value) => !value)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleteSite.isPending}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                <Trash2 size={15} /> O‘chirish
-              </button>
+              {canManageSites && (
+                <>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing((value) => !value)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleteSite.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                >
+                  <Trash2 size={15} /> O‘chirish
+                </button>
+                </>
+              )}
             </div>
           </div>
           {deleteSite.isError && (

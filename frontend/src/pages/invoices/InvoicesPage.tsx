@@ -5,6 +5,7 @@ import { InvoiceCard } from "./InvoiceCard";
 import { InvoiceForm } from "./InvoiceForm";
 import { STATUS_FILTERS } from "./invoiceUtils";
 import type { InvoiceCreatePayload } from "../../types/invoice";
+import { INVOICE_ROLES, useHasRole } from "../../lib/permissions";
 
 type StatusFilter = (typeof STATUS_FILTERS)[number]["value"];
 
@@ -15,6 +16,7 @@ export default function InvoicesPage() {
   const deferredQuery = useDeferredValue(query);
   const { data: invoices = [], isPending, isError } = useInvoices();
   const createInvoice = useCreateInvoice();
+  const canManageInvoices = useHasRole(INVOICE_ROLES);
 
   const filteredInvoices = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase();
@@ -34,9 +36,11 @@ export default function InvoicesPage() {
             <p className="mt-0.5 text-sm text-gray-400">{isPending ? "Yuklanmoqda..." : `${filteredInvoices.length} ta invoice`}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
-              <Plus size={16} /> Invoice qo'shish
-            </button>
+            {canManageInvoices && (
+              <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
+                <Plus size={16} /> Invoice qo'shish
+              </button>
+            )}
             <label className="relative">
               <span className="sr-only">Invoicelarni qidirish</span>
               <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />

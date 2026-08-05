@@ -3,6 +3,7 @@ import { Plus, Search, X } from "lucide-react";
 import { useCreateSite, useSites } from "../../hooks/useObjects";
 import { SiteCard } from "./SiteCard";
 import { SiteForm } from "./SiteForm";
+import { SITE_ROLES, useHasRole } from "../../lib/permissions";
 
 const STATUS_FILTERS = [
   { value: "all", label: "Barchasi" },
@@ -20,6 +21,7 @@ export default function ObjectsPage() {
   const deferredQuery = useDeferredValue(query);
   const { data: sites = [], isPending, isError } = useSites();
   const createSite = useCreateSite();
+  const canManageSites = useHasRole(SITE_ROLES);
 
   const filteredSites = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase();
@@ -51,14 +53,16 @@ export default function ObjectsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 cursor-pointer"
-            >
-              <Plus size={16} />
-              Obyekt qo‘shish
-            </button>
+            {canManageSites && (
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 cursor-pointer"
+              >
+                <Plus size={16} />
+                Obyekt qo‘shish
+              </button>
+            )}
             <label className="relative">
               <span className="sr-only">Obyektlarni qidirish</span>
               <Search
