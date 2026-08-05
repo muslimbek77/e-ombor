@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { useAuthStore } from "../../stores/authStore";
 import { useChangePassword } from "../../hooks/auth/useChangePassword";
@@ -207,7 +207,8 @@ function ChangePasswordCard() {
 
   return (
     <div
-      className="bg-white rounded-2xl px-5 py-4"
+      id="parol"
+      className="bg-white rounded-2xl px-5 py-4 scroll-mt-6"
       style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}
     >
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
@@ -285,6 +286,16 @@ const ProfilePage = () => {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
+  const { hash } = useLocation();
+
+  // Header menyusidagi "Parolni o'zgartirish" /profile#parol ga olib keladi —
+  // router hash bo'yicha o'zi scroll qilmaydi, shuning uchun qo'lda qilamiz.
+  useEffect(() => {
+    if (!hash) return;
+    document
+      .getElementById(hash.slice(1))
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [hash]);
 
   const handleLogout = () => {
     logout();
