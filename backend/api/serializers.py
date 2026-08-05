@@ -2,6 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ObjectDoesNotExist
 from .models import (
     Address,
     AuditLog,
@@ -736,13 +737,102 @@ class TicketSerializer(serializers.ModelSerializer):
         ]
 
 
+# --- Audit log obyekt nomlari ---
+# Jurnalda `model_name` + `object_id` saqlanadi, lekin foydalanuvchiga raqam emas,
+# obyektning o'zi ko'rinishi kerak. Har bir model uchun: (model, select_related, nom).
+AUDIT_LABEL_SOURCES = {
+    "Document": (Document, (), lambda o: f"{o.doc_number} — {o.title}"),
+    "DocumentFile": (DocumentFile, ("document",), lambda o: o.original_filename),
+    "Contract": (Contract, ("document",), lambda o: o.contract_number or o.document.doc_number),
+    "PurchaseOrder": (
+        PurchaseOrder,
+        ("document", "supplier"),
+        lambda o: f"{o.document.doc_number} — {o.supplier.name}" if o.supplier else o.document.doc_number,
+    ),
+    "Payment": (Payment, ("invoice",), lambda o: f"{o.invoice.invoice_number} — {o.amount}"),
+    "InventoryItem": (
+        InventoryItem,
+        ("material", "warehouse"),
+        lambda o: f"{o.material.name} — {o.warehouse.name}",
+    ),
+    "StockMovement": (
+        StockMovement,
+        ("material", "warehouse"),
+        lambda o: f"{o.material.name} — {o.warehouse.name}",
+    ),
+    "Ticket": (Ticket, (), lambda o: o.title),
+    "User": (User, (), lambda o: o.full_name.strip() or o.email),
+    # Quyidagilarni hozircha faqat `seed_demo_data` yozadi, lekin demo bazada ular ham
+    # jurnalda ko'rinadi — id qolib ketmasin.
+    "Supplier": (Supplier, (), lambda o: o.name),
+    "ConstructionSite": (ConstructionSite, (), lambda o: o.name),
+    "ProductionRequest": (
+        ProductionRequest,
+        (),
+        lambda o: f"{o.request_number} — {o.title}",
+    ),
+}
+
+# Obyekt o'chirilgan bo'lsa bazadan topilmaydi — nomni `details` ichidan qidiramiz.
+AUDIT_DETAIL_LABEL_KEYS = ("email", "title", "name", "doc_number", "contract_number", "invoice_number")
+
+
+def build_audit_object_labels(logs):
+    """`(model_name, object_id)` → o'qiladigan nom. Har bir model uchun bitta so'rov."""
+    wanted = {}
+    for log in logs:
+        if log.object_id is None or log.model_name not in AUDIT_LABEL_SOURCES:
+            continue
+        wanted.setdefault(log.model_name, set()).add(log.object_id)
+
+    labels = {}
+    for model_name, ids in wanted.items():
+        model, related, to_label = AUDIT_LABEL_SOURCES[model_name]
+        queryset = model.objects.filter(pk__in=ids)
+        if related:
+            queryset = queryset.select_related(*related)
+        for obj in queryset:
+            try:
+                label = to_label(obj)
+            except (AttributeError, ObjectDoesNotExist):
+                continue
+            if label:
+                labels[(model_name, obj.pk)] = str(label).strip()
+
+    return labels
+
+
+def audit_detail_label(log):
+    details = log.details if isinstance(log.details, dict) else None
+    if not details:
+        return None
+
+    for key in AUDIT_DETAIL_LABEL_KEYS:
+        value = details.get(key)
+        if value:
+            return str(value)
+
+    return None
+
+
+class AuditLogListSerializer(serializers.ListSerializer):
+    """Sahifadagi barcha yozuvlar uchun nomlarni oldindan yig'adi (N+1 bo'lmasin)."""
+
+    def to_representation(self, data):
+        items = list(data)
+        self.child.object_labels = build_audit_object_labels(items)
+        return super().to_representation(items)
+
+
 class AuditLogSerializer(serializers.ModelSerializer):
     """Audit log serializeri."""
 
     user_name = serializers.CharField(source="user.full_name", read_only=True)
+    object_label = serializers.SerializerMethodField()
 
     class Meta:
         model = AuditLog
+        list_serializer_class = AuditLogListSerializer
         fields = [
             "id",
             "user",
@@ -750,8 +840,17 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "action",
             "model_name",
             "object_id",
+            "object_label",
             "details",
             "ip_address",
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_object_label(self, obj):
+        """Obyekt topilmasa (o'chirilgan yoki noma'lum model) `None` — UI id ko'rsatadi."""
+        labels = getattr(self, "object_labels", None)
+        if labels is None:
+            labels = build_audit_object_labels([obj])
+
+        return labels.get((obj.model_name, obj.object_id)) or audit_detail_label(obj)

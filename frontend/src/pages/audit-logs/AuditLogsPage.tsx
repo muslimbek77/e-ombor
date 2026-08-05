@@ -20,7 +20,7 @@ export default function AuditLogsPage() {
     return logs.filter((log) => {
       const matchesAction = actionFilter === ALL || log.action === actionFilter;
       const matchesUser = userFilter === ALL || log.user_name === userFilter;
-      const matchesQuery = !normalizedQuery || [log.action, log.model_name, log.user_name, log.ip_address].some((value) => (value ?? "").toLocaleLowerCase().includes(normalizedQuery));
+      const matchesQuery = !normalizedQuery || [actionLabel(log.action), log.model_name, log.object_label, log.user_name, log.ip_address].some((value) => (value ?? "").toLocaleLowerCase().includes(normalizedQuery));
       return matchesAction && matchesUser && matchesQuery;
     });
   }, [deferredQuery, actionFilter, userFilter, logs]);
@@ -62,7 +62,7 @@ export default function AuditLogsPage() {
                   <th className="px-4 py-3">Foydalanuvchi</th>
                   <th className="px-4 py-3">Amal</th>
                   <th className="px-4 py-3">Model</th>
-                  <th className="px-4 py-3">Obyekt ID</th>
+                  <th className="px-4 py-3">Obyekt</th>
                   <th className="px-4 py-3">IP manzil</th>
                 </tr>
               </thead>
@@ -75,7 +75,7 @@ export default function AuditLogsPage() {
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${actionBadgeClass(log.action)}`}>{actionLabel(log.action)}</span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{log.model_name}</td>
-                    <td className="px-4 py-3 text-gray-500">{log.object_id ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-600">{log.object_label ?? (log.object_id != null ? `#${log.object_id}` : "—")}</td>
                     <td className="px-4 py-3 text-gray-500">{log.ip_address ?? "—"}</td>
                   </tr>
                 ))}

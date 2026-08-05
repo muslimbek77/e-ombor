@@ -826,8 +826,14 @@ class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
             )
 
         instance = self.get_object()
+        # `doc_number` ni ham yozamiz: buyurtma o'chgach jurnal uni bazadan topa
+        # olmaydi va nomni shu yerdan oladi (serializers.AUDIT_DETAIL_LABEL_KEYS).
         create_audit_log(
-            request, "purchase_order_deleted", "PurchaseOrder", instance.id, {"document_id": instance.document_id}
+            request,
+            "purchase_order_deleted",
+            "PurchaseOrder",
+            instance.id,
+            {"document_id": instance.document_id, "doc_number": instance.document.doc_number},
         )
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
