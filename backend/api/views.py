@@ -3,11 +3,11 @@ import csv
 from io import StringIO
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import F, Q, Sum, Count
 from django.http import HttpResponse
 from django.utils import timezone
-from rest_framework import generics, permissions, serializers, status
+from rest_framework import exceptions, generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -74,6 +74,11 @@ ARCHIVE_ROLES = {"admin", "procurement", "branch_manager"}
 STOCK_MOVEMENT_ROLES = {"admin", "warehouse"}
 PURCHASE_ORDER_ROLES = {"admin", "procurement"}
 CONTRACT_ROLES = {"admin", "procurement"}
+SUPPLIER_ROLES = {"admin", "procurement"}
+INVOICE_ROLES = {"admin", "accountant", "procurement"}
+PAYMENT_ROLES = {"admin", "accountant"}
+SITE_ROLES = {"admin", "branch_manager", "architecture"}
+DOCUMENT_MANAGE_ROLES = {"admin", "procurement", "branch_manager"}
 WORKFLOW_RULES = {
     "created": {"submit": {"next_status": "architecture", "roles": {"prorab", "procurement", "admin"}}},
     "architecture": {
@@ -106,14 +111,72 @@ def is_admin(user):
     return user.is_staff or bool(ADMIN_ROLES.intersection(user.roles or []))
 
 
+def has_any_role(user, roles):
+    return is_admin(user) or bool(set(user.roles or []).intersection(roles))
+
+
+class RoleGatedWrite(permissions.BasePermission):
+    """
+    O'qish hammaga (autentifikatsiyadan o'tganlarga), yozish esa faqat
+    `write_roles` dagi rollarga ochiq.
+
+    Ma'lumotnoma bazasi — filial, material, ombor, obyekt, yetkazib beruvchi —
+    ilgari hech qanday rol tekshiruvisiz edi: istalgan xodim material qo'sha,
+    ombor tahrirlay yoki filialni butunlay o'chira olardi (filial o'chsa unga
+    bog'langan foydalanuvchilar filialsiz qolardi).
+    """
+
+    write_roles = ADMIN_ROLES
+    message = "Bu bo'limni o'zgartirish uchun sizda ruxsat yo'q"
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return has_any_role(request.user, self.write_roles)
+
+
+class AdminOnlyWrite(RoleGatedWrite):
+    write_roles = ADMIN_ROLES
+
+
+class SupplierWrite(RoleGatedWrite):
+    write_roles = SUPPLIER_ROLES
+    message = "Yetkazib beruvchini o'zgartirish uchun sizda ruxsat yo'q"
+
+
+class SiteWrite(RoleGatedWrite):
+    write_roles = SITE_ROLES
+    message = "Qurilish obyektini o'zgartirish uchun sizda ruxsat yo'q"
+
+
+class InvoiceWrite(RoleGatedWrite):
+    write_roles = INVOICE_ROLES
+    message = "Hisob-fakturani o'zgartirish uchun sizda ruxsat yo'q"
+
+
+class PaymentWrite(RoleGatedWrite):
+    write_roles = PAYMENT_ROLES
+    message = "To'lov qayd etish uchun sizda ruxsat yo'q"
+
+
 def can_manage_stock(user):
     """Zaxira o'zgartiradigan har qanday amal — faqat omborchi va admin."""
     return is_admin(user) or bool(set(user.roles or []).intersection(STOCK_MOVEMENT_ROLES))
 
 
 def branch_scope(queryset, user, field_name="branch"):
-    if is_admin(user) or not user.branch_id:
+    """
+    Natijani foydalanuvchi filiali bilan cheklaydi.
+
+    Filialsiz foydalanuvchi bo'sh natija oladi. Ilgari bu holat filtrni
+    butunlay o'chirar edi, ya'ni `/auth/register/` orqali ochilgan yangi
+    hisob (filiali yo'q) barcha filiallarning hujjatlari, shartnomalari va
+    to'lovlarini ko'ra olardi.
+    """
+    if is_admin(user):
         return queryset
+    if not user.branch_id:
+        return queryset.none()
     return queryset.filter(**{field_name: user.branch})
 
 
@@ -125,16 +188,52 @@ def filter_by_query_params(queryset, request, mapping):
     return queryset
 
 
+def next_sequence_number(queryset, field_name, prefix):
+    """
+    `prefix` bilan boshlanadigan eng katta raqamdan keyingisini qaytaradi.
+
+    Ilgari raqam `count() + 1` bilan yig'ilardi. Bitta yozuv o'chirilishi
+    bilan sanoq orqaga qaytar va keyingi yozuv allaqachon band raqamni
+    so'rar edi — unique cheklovi buzilib, foydalanuvchi 500 olardi. Mavjud
+    eng katta qiymatdan hisoblash raqamni faqat oldinga suradi.
+    """
+    highest = 0
+    existing = queryset.filter(**{f"{field_name}__startswith": prefix}).values_list(
+        field_name, flat=True
+    )
+    for value in existing:
+        tail = value[len(prefix):]
+        if tail.isdigit():
+            highest = max(highest, int(tail))
+    return highest + 1
+
+
 def build_document_number(doc_type):
     prefix_map = {
         "purchase_request": "XR",
         "contract": "SH",
         "invoice": "INV",
     }
-    prefix = prefix_map.get(doc_type, "DOC")
-    year = timezone.now().year
-    count = Document.objects.filter(doc_type=doc_type, created_at__year=year).count() + 1
-    return f"{prefix}-{year}-{count:04d}"
+    prefix = f"{prefix_map.get(doc_type, 'DOC')}-{timezone.now().year}-"
+    return f"{prefix}{next_sequence_number(Document.objects, 'doc_number', prefix):04d}"
+
+
+def save_with_unique_number(save):
+    """
+    `save(...)` ni raqam to'qnashuvida qayta chaqiradi.
+
+    Raqam o'qish va yozish o'rtasida boshqa so'rov o'sha raqamni band qilib
+    ulgurishi mumkin. Bunda IntegrityError qaytadi — qayta urinish yangi
+    raqamni oladi.
+    """
+    last_error = None
+    for _ in range(5):
+        try:
+            with transaction.atomic():
+                return save()
+        except IntegrityError as exc:
+            last_error = exc
+    raise last_error
 
 
 def create_audit_log(request, action, model_name, object_id=None, details=None):
@@ -212,8 +311,11 @@ def create_low_stock_notifications(item):
 
 def scoped_audit_logs(user):
     queryset = AuditLog.objects.select_related("user").order_by("-created_at")
-    if is_admin(user) or not user.branch_id:
+    if is_admin(user):
         return queryset
+    if not user.branch_id:
+        # Filialsiz foydalanuvchiga faqat o'z izlari ko'rinadi.
+        return queryset.filter(user=user)
 
     return queryset.filter(
         Q(user__branch=user.branch)
@@ -571,10 +673,12 @@ class DocumentListCreateView(generics.ListCreateAPIView):
         branch = site.branch if site else self.request.user.branch
         if site and not is_admin(self.request.user) and self.request.user.branch_id and site.branch_id != self.request.user.branch_id:
             raise serializers.ValidationError("Siz faqat o'z filiali obyektiga hujjat yarata olasiz")
-        document = serializer.save(
-            created_by=self.request.user,
-            branch=branch,
-            doc_number=build_document_number(serializer.validated_data["doc_type"]),
+        document = save_with_unique_number(
+            lambda: serializer.save(
+                created_by=self.request.user,
+                branch=branch,
+                doc_number=build_document_number(serializer.validated_data["doc_type"]),
+            )
         )
         create_audit_log(
             self.request,
@@ -755,12 +859,40 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Hujjat tahrirlash va o'chirish."""
     serializer_class = DocumentSerializer
     permission_classes = (permissions.IsAuthenticated,)
-    
+
     def get_queryset(self):
         return branch_scope(
             Document.objects.select_related("created_by", "site", "branch").prefetch_related("approvals"),
             self.request.user,
         ).order_by("-created_at")
+
+    def _ensure_can_manage(self, document):
+        """
+        Hujjatni faqat muallifi yoki hujjat oqimiga mas'ul rollar
+        o'zgartira/o'chira oladi. Ilgari o'z filialidagi istalgan xodim
+        begona hujjatni o'chirib yubora olardi.
+        """
+        user = self.request.user
+        if document.created_by_id == user.id or has_any_role(user, DOCUMENT_MANAGE_ROLES):
+            return
+        raise exceptions.PermissionDenied("Bu hujjatni o'zgartirish uchun sizda ruxsat yo'q")
+
+    def update(self, request, *args, **kwargs):
+        self._ensure_can_manage(self.get_object())
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        document = self.get_object()
+        self._ensure_can_manage(document)
+
+        create_audit_log(
+            request,
+            "document_deleted",
+            "Document",
+            document.id,
+            {"doc_number": document.doc_number, "branch_id": document.branch_id},
+        )
+        return super().destroy(request, *args, **kwargs)
 
 
 # --- Purchase Order Views ---
@@ -868,14 +1000,14 @@ class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
 class MaterialListView(generics.ListCreateAPIView):
     """Materiallar ro'yxati va yaratish."""
     serializer_class = MaterialSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
     queryset = Material.objects.all()
 
 
 class MaterialDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Material tahrirlash va o'chirish."""
     serializer_class = MaterialSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
     queryset = Material.objects.all()
 
 
@@ -883,7 +1015,7 @@ class MaterialDetailView(generics.RetrieveUpdateDestroyAPIView):
 class WarehouseListView(generics.ListCreateAPIView):
     """Omborxonalar ro'yxati va yaratish."""
     serializer_class = WarehouseSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
     queryset = Warehouse.objects.select_related("branch").all()
 
     def get_queryset(self):
@@ -893,8 +1025,14 @@ class WarehouseListView(generics.ListCreateAPIView):
 class WarehouseDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Omborxona tahrirlash va o'chirish."""
     serializer_class = WarehouseSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
     queryset = Warehouse.objects.select_related("branch").all()
+
+    def get_queryset(self):
+        # Ro'yxat filial bo'yicha filtrlanadi — tafsilot ham shunday bo'lishi
+        # kerak, aks holda id ni taxmin qilib begona filial omborini o'qish,
+        # tahrirlash va o'chirish mumkin edi.
+        return branch_scope(super().get_queryset(), self.request.user)
 
 
 # --- Inventory Views ---
@@ -1165,7 +1303,7 @@ class InventoryExportView(APIView):
 class ConstructionSiteListView(generics.ListCreateAPIView):
     """Qurilish obyektlari ro'yxati va yaratish."""
     serializer_class = ConstructionSiteSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, SiteWrite)
     queryset = ConstructionSite.objects.all()
     
     def get_queryset(self):
@@ -1184,22 +1322,25 @@ class ConstructionSiteListView(generics.ListCreateAPIView):
 class ConstructionSiteDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Qurilish obyekti tahrirlash va o'chirish."""
     serializer_class = ConstructionSiteSerializer
-    permission_classes = (permissions.IsAuthenticated,)
-    queryset = ConstructionSite.objects.all()
+    permission_classes = (permissions.IsAuthenticated, SiteWrite)
+    queryset = ConstructionSite.objects.select_related("branch", "prorab")
+
+    def get_queryset(self):
+        return branch_scope(super().get_queryset(), self.request.user)
 
 
 # --- Branch Views ---
 class BranchListView(generics.ListCreateAPIView):
     """Filiallar ro'yxati."""
     serializer_class = BranchSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
     queryset = Branch.objects.all().order_by("name")
 
 
 class BranchDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Filial tahrirlash va o'chirish."""
     serializer_class = BranchSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
     queryset = Branch.objects.all()
 
 
@@ -1207,14 +1348,14 @@ class BranchDetailView(generics.RetrieveUpdateDestroyAPIView):
 class SupplierListView(generics.ListCreateAPIView):
     """Etkazib beruvchilar ro'yxati."""
     serializer_class = SupplierSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, SupplierWrite)
     queryset = Supplier.objects.all().order_by("name")
 
 
 class SupplierDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Etkazib beruvchi tahrirlash va o'chirish."""
     serializer_class = SupplierSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, SupplierWrite)
     queryset = Supplier.objects.all()
 
 
@@ -1280,14 +1421,14 @@ class AuditLogListView(generics.ListAPIView):
 class AddressListView(generics.ListCreateAPIView):
     """Manzillar ro'yxati."""
     serializer_class = AddressSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
     queryset = Address.objects.all()
 
 
 class AddressDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Manzil tahrirlash va o'chirish."""
     serializer_class = AddressSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
     queryset = Address.objects.all()
 
 
@@ -1311,7 +1452,12 @@ class DocumentFileUploadView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
     
     def post(self, request, doc_pk):
-        document = Document.objects.filter(id=doc_pk).first()
+        # Fayllar ro'yxati filial bo'yicha filtrlanadi; yuklash ham shunday
+        # cheklanishi kerak, aks holda begona filial hujjatiga fayl ilib
+        # qo'yish mumkin edi.
+        document = branch_scope(
+            Document.objects.select_related("branch"), request.user
+        ).filter(id=doc_pk).first()
         if not document:
             return Response({'error': 'Hujjat topilmadi'}, status=status.HTTP_404_NOT_FOUND)
         
@@ -1420,7 +1566,7 @@ class ContractDetailView(generics.RetrieveUpdateAPIView):
 class InvoiceListView(generics.ListCreateAPIView):
     """Hisob-fakturalar ro'yxati."""
     serializer_class = InvoiceSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, InvoiceWrite)
     queryset = Invoice.objects.select_related("document", "contract", "document__branch").order_by("-invoice_date")
 
     def get_queryset(self):
@@ -1430,7 +1576,7 @@ class InvoiceListView(generics.ListCreateAPIView):
 class InvoiceDetailView(generics.RetrieveUpdateAPIView):
     """Hisob-faktura tafsilotlari."""
     serializer_class = InvoiceSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, InvoiceWrite)
     queryset = Invoice.objects.select_related("document", "contract", "document__branch").order_by("-invoice_date")
 
     def get_queryset(self):
@@ -1454,7 +1600,7 @@ class PaymentListView(generics.ListAPIView):
 class PaymentCreateView(generics.CreateAPIView):
     """To'lov yaratish."""
     serializer_class = PaymentSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, PaymentWrite)
     
     def perform_create(self, serializer):
         invoice_id = self.kwargs.get('invoice_pk')
@@ -1510,13 +1656,15 @@ class ProductionRequestListView(generics.ListCreateAPIView):
         ).order_by("-created_at")
     
     def perform_create(self, serializer):
-        today = timezone.now().strftime('%Y%m%d')
-        count = ProductionRequest.objects.filter(
-            created_at__date=timezone.localdate()
-        ).count() + 1
-        serializer.save(
-            created_by=self.request.user,
-            request_number=f"PR-{today}-{count:04d}"
+        prefix = f"PR-{timezone.localdate().strftime('%Y%m%d')}-"
+        save_with_unique_number(
+            lambda: serializer.save(
+                created_by=self.request.user,
+                request_number=(
+                    f"{prefix}"
+                    f"{next_sequence_number(ProductionRequest.objects, 'request_number', prefix):04d}"
+                ),
+            )
         )
 
 
@@ -1544,21 +1692,19 @@ class TicketListView(generics.ListCreateAPIView):
         qs = Ticket.objects.select_related(
             'created_by', 'assigned_to', 'branch', 'site'
         ).order_by('-created_at')
-        
-        if user.is_staff or 'admin' in user.roles:
-            return qs
-        
-        if user.branch:
-            qs = qs.filter(branch=user.branch)
-        else:
-            qs = qs.filter(created_by=user)
+
+        # Admin uchun ilgari shu yerda `return qs` bor edi va status/priority/
+        # category filtrlari jimgina e'tiborsiz qolardi — ro'yxat filtrlanmagan
+        # holda qaytar edi. Endi ko'rish doirasi va filtr ajratilgan.
+        if not is_admin(user):
+            qs = qs.filter(branch=user.branch) if user.branch_id else qs.filter(created_by=user)
 
         return filter_by_query_params(
             qs,
             self.request,
             {"status": "status", "priority": "priority", "category": "category"},
         )
-    
+
     def perform_create(self, serializer):
         site = serializer.validated_data.get("site")
         if site and not is_admin(self.request.user) and self.request.user.branch_id and site.branch_id != self.request.user.branch_id:
