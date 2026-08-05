@@ -57,7 +57,15 @@ SERIALIZER_WORKFLOW_RULES = {
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Foydalanuvchi ma'lumotlari serializeri."""
+    """
+    Foydalanuvchi ma'lumotlari serializeri.
+
+    `UserProfileView` shu serializer bilan profilni tahrirlaydi, shuning uchun
+    imtiyoz beruvchi maydonlar (rol, filial, staff bayrog'i) bu yerda faqat
+    o'qish uchun. Aks holda oddiy xodim `PATCH /auth/user/` orqali o'ziga
+    `admin` rolini yozib qo'ya olardi. Adminning o'zi ularni
+    `UserCreateSerializer` / `UserUpdateSerializer` orqali o'zgartiradi.
+    """
 
     full_name = serializers.CharField(read_only=True)
     branch_name = serializers.CharField(source="branch.name", read_only=True)
@@ -81,11 +89,29 @@ class UserSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "last_login", "branch_name"]
+        read_only_fields = [
+            "id",
+            "email",
+            "roles",
+            "branch",
+            "branch_name",
+            "is_active",
+            "is_staff",
+            "last_login",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
-    """Ro'yxatdan o'tish serializeri."""
+    """
+    Ro'yxatdan o'tish serializeri.
+
+    `roles` va `branch` bu yerda ataylab yo'q: register endpointi `AllowAny`,
+    ya'ni maydonlar ochiq bo'lsa istalgan odam o'ziga `["admin"]` rolini yoki
+    begona filialni biriktirib yubora olardi. Yangi hisob rolsiz va filialsiz
+    tug'iladi — ikkalasini ham keyin admin beradi.
+    """
 
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True, required=True)
@@ -100,8 +126,6 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             "last_name",
             "phone",
             "stir_inn",
-            "roles",
-            "branch",
         ]
 
     def validate(self, attrs):
