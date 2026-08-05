@@ -56,16 +56,12 @@ export const useAuthStore = create<AuthState>()(
           user,
         }),
 
-      logout: () => {
-        console.log("Logout called");
+      logout: () =>
         set({
           accessToken: null,
           refreshToken: null,
           user: null,
-        });
-
-        console.log("After logout:", useAuthStore.getState());
-      },
+        }),
     }),
     {
       name: "auth-storage",

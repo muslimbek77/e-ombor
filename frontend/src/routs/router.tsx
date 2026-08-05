@@ -39,7 +39,6 @@ import ReportsPage from "../pages/reports/ReportsPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const accessToken = useAuthStore((state) => state.accessToken);
-  console.log(accessToken);
 
   if (!accessToken) {
     return <Navigate to="/login" replace />;
