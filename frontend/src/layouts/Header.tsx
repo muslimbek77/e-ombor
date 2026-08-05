@@ -122,13 +122,11 @@ function NotificationBell({
 function MenuItem({
   icon,
   label,
-  badge,
   danger,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
-  badge?: number;
   danger?: boolean;
   onClick: () => void;
 }) {
@@ -144,19 +142,11 @@ function MenuItem({
     >
       <span className={danger ? "text-red-500" : "text-gray-400"}>{icon}</span>
       <span className="flex-1">{label}</span>
-      {badge !== undefined && badge > 0 && (
-        <span
-          className="flex-shrink-0 rounded-full text-white font-bold text-[10px] px-1.5 py-0.5 min-w-[18px] text-center"
-          style={{ background: "#ef4444" }}
-        >
-          {badge > 99 ? "99+" : badge}
-        </span>
-      )}
     </button>
   );
 }
 
-function UserMenu({ unreadCount }: { unreadCount: number }) {
+function UserMenu() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
@@ -326,7 +316,7 @@ export default function Header({
         />
 
         {/* User / Role menu */}
-        <UserMenu unreadCount={unreadCount} />
+        <UserMenu />
       </div>
     </header>
   );
