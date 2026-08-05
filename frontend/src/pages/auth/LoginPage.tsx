@@ -257,7 +257,7 @@ export default function LoginPage() {
               autoComplete="current-password"
               value={form.password}
               onChange={handleChange}
-              onKeyDown={(e) => e.key === "Enter" && loginMutation.mutate(form)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               placeholder="Parolni kiriting"
               className={`w-full h-[42px] pl-3.5 pr-10 rounded-xl text-[14px] text-indigo-950 placeholder-indigo-200 bg-indigo-50/50 outline-none transition-all border ${
                 errors.password
