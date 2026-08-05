@@ -273,18 +273,28 @@ class CustomTokenRefreshView(APIView):
 
 
 class LogoutView(APIView):
-    """Logout - tokenlarni blacklisted qilish."""
+    """Logout - refresh tokenni blacklist qilish."""
+
     permission_classes = (permissions.IsAuthenticated,)
-    
+
     def post(self, request):
+        refresh_token = request.data.get('refresh')
+        if not refresh_token:
+            return Response(
+                {'error': 'refresh token topilmadi'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
-            refresh_token = request.data.get('refresh')
-            if refresh_token:
-                token = RefreshToken(refresh_token)
-                token.blacklist()
-            return Response({'message': 'Muvaffaqiyatli chiqildi'}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            RefreshToken(refresh_token).blacklist()
+        except TokenError:
+            # Token allaqachon blacklistda yoki muddati tugagan — maqsadga
+            # baribir erishilgan, shuning uchun buni xato deb hisoblamaymiz.
+            # (Ilgari bu yerda `str(e)` qaytarilib, ichki xabar tashqariga
+            # chiqib ketardi.)
+            pass
+
+        return Response({'message': 'Muvaffaqiyatli chiqildi'}, status=status.HTTP_200_OK)
 
 
 class ChangePasswordView(APIView):
