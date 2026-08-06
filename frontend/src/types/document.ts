@@ -3,6 +3,7 @@ export type DocType = "purchase_request" | "contract" | "invoice";
 /** Zanjir manbasi — `backend/api/workflow.py`. */
 export type DocStatus =
   | "created"
+  | "revision"
   | "architecture"
   | "ceo"
   | "procurement"
@@ -13,7 +14,7 @@ export type DocStatus =
   | "closed"
   | "rejected";
 
-export type WorkflowAction = "submit" | "approve" | "advance" | "close" | "reject" | "reopen";
+export type WorkflowAction = "submit" | "approve" | "advance" | "close" | "reject" | "return" | "reopen";
 
 export interface DocumentApproval {
   id: number;
@@ -95,4 +96,22 @@ export interface DocumentFilesResponse {
 export interface WorkflowActionPayload {
   action: WorkflowAction;
   comment?: string;
+  /** Faqat `advance` uchun: xarid qatorlari qaysi omborga kirim bo'ladi. */
+  warehouse?: number;
+}
+
+export interface DocumentComment {
+  id: number;
+  document: number;
+  text: string;
+  author: number | null;
+  author_name: string;
+  created_at: string;
+}
+
+export interface DocumentCommentsResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: DocumentComment[];
 }

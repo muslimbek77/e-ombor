@@ -22,6 +22,7 @@ from .models import (
     Contract,
     Document,
     DocumentApproval,
+    DocumentComment,
     DocumentFile,
     InventoryItem,
     Invoice,
@@ -30,6 +31,7 @@ from .models import (
     Payment,
     ProductionRequest,
     PurchaseOrder,
+    PurchaseOrderItem,
     Supplier,
     Ticket,
     User,
@@ -43,6 +45,7 @@ from .serializers import (
     ConstructionSiteSerializer,
     ContractSerializer,
     CustomTokenObtainPairSerializer,
+    DocumentCommentSerializer,
     DocumentFileSerializer,
     DocumentSerializer,
     DocumentWorkflowSerializer,
@@ -68,7 +71,7 @@ from .serializers import (
     WarehouseSerializer,
 )
 from .permissions import ControlRoleReadOnly
-from .workflow import WORKFLOW_RULES, is_editable
+from .workflow import COMMENT_REQUIRED_ACTIONS, WORKFLOW_RULES, is_editable
 
 
 # Qo'shimcha ruxsat sinfi kerak bo'lgan view'lar uchun. DRF'da `permission_classes`
@@ -82,7 +85,15 @@ ADMIN_ROLES = {"admin"}
 # huquqi quyidagi alohida to'plamlar bilan tekshiriladi va bu yerga bog'liq
 # emas. CEO va xaridlar bo'limi barcha filiallar bo'yicha qaror qabul qiladi,
 # nazorat roli esa butun tizimni ko'rmasa vazifasini bajara olmaydi.
-GLOBAL_SCOPE_ROLES = {"admin", "ceo", "procurement", "anticorruption"}
+#
+# `architecture` va `accountant` ham shu yerda, va sabab boshqacha: ular
+# ZANJIR BOSQICHI. Filialga bog'langanida boshqa filial hujjati ularga
+# ko'rinmasdi va zanjir birinchi tasdiqdayoq 404 ga urilib to'xtardi —
+# filialda o'z arxitektori yoki buxgalteri bo'lmasa hujjat umuman
+# tasdiqlanmasdi. Zanjir bosqichi bo'lgan rol o'z navbatidagi hujjatni
+# ko'rishi shart. `warehouse` bu yerda ataylab yo'q: u tovarni jismonan
+# qabul qiladi, ya'ni haqiqatan filialga bog'langan.
+GLOBAL_SCOPE_ROLES = {"admin", "ceo", "procurement", "anticorruption", "architecture", "accountant"}
 ARCHIVE_ROLES = {"admin", "procurement", "branch_manager"}
 STOCK_MOVEMENT_ROLES = {"admin", "warehouse"}
 # Filial rahbari so'rovni o'zi to'ldiradi — material qatorlarisiz so'rovning
@@ -300,6 +311,14 @@ class DocumentFrozen(exceptions.APIException):
     status_code = status.HTTP_409_CONFLICT
 
 
+# Xato xabaridagi holatlar ro'yxati qo'lda yozilmaydi: `EDITABLE_STATUSES` ga
+# `revision` qo'shilganda xabar eskirib qolgan edi va foydalanuvchiga mavjud
+# yo'lni ko'rsatmasdi. Endi u zanjirning o'zidan hosil bo'ladi.
+EDITABLE_STATUS_LABELS = ", ".join(
+    label for value, label in Document.STATUSES if is_editable(value)
+)
+
+
 def ensure_document_editable(document):
     """
     Hujjat tahrirlanadigan holatdami — aks holda `DocumentFrozen`.
@@ -307,8 +326,9 @@ def ensure_document_editable(document):
     Ilgari holat umuman tekshirilmasdi: tasdiqlangan, hatto `closed` hujjatning
     summasi ham o'zgartirilishi mumkin edi. Bunda arxitektura, rais va nazorat
     bergan tasdiqlar aslida boshqa hujjatga berilgan bo'lib qolardi va
-    zanjirning butun qiymati yo'qolardi. Xato topilsa yo'l bitta: `reject`,
-    so'ng `reopen` — bu izohi va tarixi bilan qayd etiladi.
+    zanjirning butun qiymati yo'qolardi. Xato topilsa yo'l: bosqichdagi mas'ul
+    `return` qiladi (yoki `reject`), egasi tuzatib qayta yuboradi — bu izohi va
+    tarixi bilan qayd etiladi.
 
     403 emas, 409: gap ruxsatda emas, hujjatning holatida. Hatto admin ham
     `closed` hujjatni tahrirlay olmaydi.
@@ -316,7 +336,7 @@ def ensure_document_editable(document):
     if not is_editable(document.status):
         raise DocumentFrozen(
             f"{document.doc_number} hujjati «{document.get_status_display()}» holatida — "
-            "tahrirlash faqat YARATILDI va RAD ETILDI holatlarida mumkin"
+            f"tahrirlash faqat {EDITABLE_STATUS_LABELS} holatlarida mumkin"
         )
 
 
@@ -350,6 +370,68 @@ def create_low_stock_notifications(item):
     title = "Kam zaxira ogohlantirishi"
     message = f"{item.material.name} materiali {item.warehouse.name} omborida minimal chegaraga tushdi."
     notify_branch_roles(item.warehouse.branch, {"warehouse", "branch_manager", "admin"}, title, message, "warning")
+
+
+class ReceiptError(Exception):
+    """Qabul qilishni bajarib bo'lmadi (ombor tanlanmagan yoki begona)."""
+
+
+def resolve_receipt_warehouse(document, warehouse):
+    """
+    Qabul qilinadigan omborni tekshiradi.
+
+    Ombor taxmin qilinmaydi — filialda bitta ombor bo'lsa ham. Tovarni qabul
+    qilayotgan omborchi u qayerga kirganini o'zi biladi va shuni ko'rsatadi;
+    noto'g'ri omborga tushgan kirim esa keyin faqat teskari harakat bilan
+    tuzatiladi (`StockMovement` o'chirilmaydi).
+    """
+    if warehouse is None:
+        raise ReceiptError("Qabul qilinadigan ombor ko'rsatilishi shart")
+    if warehouse.branch_id != document.branch_id:
+        raise ReceiptError("Ombor hujjat filialiga tegishli emas")
+    return warehouse
+
+
+def receive_purchase_items(document, user, warehouse=None):
+    """
+    `delivering → received`: xarid qatorlarini ombor qoldig'iga kiritadi.
+
+    Ilgari bu o'tish faqat statusni almashtirardi. Ya'ni zanjir yakunlangan,
+    tovar omborda, lekin qoldiq eski — xaridlar bo'limi keyingi so'rov bo'yicha
+    qaror qabul qilishda ko'radigan raqam zanjir natijasini aks ettirmasdi.
+
+    Chaqiruvchi transaksiya ichida ishlaydi: kirim va status bir vaqtda
+    yoziladi yoki umuman yozilmaydi.
+    """
+    items = list(
+        PurchaseOrderItem.objects.filter(purchase_order__document=document)
+        .select_related("material")
+        .exclude(material__isnull=True)
+    )
+    if not items:
+        # Xarid buyurtmasi yo'q yoki qatorlari bo'sh — hamma hujjat xarid
+        # so'rovi emas. Bu xato emas, shunchaki kirim qiladigan narsa yo'q,
+        # shuning uchun ombor ham so'ralmaydi.
+        return []
+
+    target = resolve_receipt_warehouse(document, warehouse)
+    movements = []
+    for item in items:
+        inventory_item = lock_inventory_item(target, item.material, create_if_missing=True)
+        inventory_item.quantity += item.quantity
+        inventory_item.save(update_fields=["quantity", "updated_at"])
+        movements.append(
+            StockMovement.objects.create(
+                warehouse=target,
+                material=item.material,
+                movement_type="IN",
+                quantity=item.quantity,
+                reference_doc=document,
+                performed_by=user,
+                notes=f"{document.doc_number} bo'yicha qabul qilindi",
+            )
+        )
+    return movements
 
 
 def scoped_audit_logs(user):
@@ -769,19 +851,37 @@ class DocumentWorkflowActionView(APIView):
         if not (is_admin(request.user) or bool(set(request.user.roles or []).intersection(rule["roles"]))):
             return Response({"error": "Bu amal uchun sizda ruxsat yo'q"}, status=status.HTTP_403_FORBIDDEN)
 
-        if action == "reject" and not comment:
-            return Response({"error": "Rad etishda sabab kiritish majburiy"}, status=status.HTTP_400_BAD_REQUEST)
+        if action in COMMENT_REQUIRED_ACTIONS and not comment:
+            return Response(
+                {"error": COMMENT_REQUIRED_ACTIONS[action]}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         previous_status = document.status
-        document.status = rule["next_status"]
-        document.save(update_fields=["status", "updated_at"])
+        next_status = rule["next_status"]
 
-        DocumentApproval.objects.create(
-            document=document,
-            approver=request.user,
-            action=action,
-            comment=comment,
-        )
+        try:
+            with transaction.atomic():
+                # Qabul — statusning yon ta'siri emas, uning mazmuni: tovar
+                # omborga kiradi. Ikkalasi bitta transaksiyada, aks holda
+                # status o'zgarib qoldiq o'zgarmay qolishi mumkin edi.
+                movements = (
+                    receive_purchase_items(
+                        document, request.user, serializer.validated_data.get("warehouse")
+                    )
+                    if next_status == "received"
+                    else []
+                )
+                document.status = next_status
+                document.save(update_fields=["status", "updated_at"])
+                DocumentApproval.objects.create(
+                    document=document,
+                    approver=request.user,
+                    action=action,
+                    comment=comment,
+                )
+        except ReceiptError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         create_audit_log(
             request,
             "document_workflow_changed",
@@ -789,6 +889,21 @@ class DocumentWorkflowActionView(APIView):
             document.id,
             {"from": previous_status, "to": document.status, "action": action, "comment": comment},
         )
+        if movements:
+            create_audit_log(
+                request,
+                "document_stock_received",
+                "Document",
+                document.id,
+                {
+                    "doc_number": document.doc_number,
+                    "warehouse_id": movements[0].warehouse_id,
+                    "movement_ids": [movement.id for movement in movements],
+                    "branch_id": document.branch_id,
+                },
+            )
+        if previous_status == "revision":
+            self._notify_returners(document, request.user)
 
         recipients = [document.created_by]
         notify_branch_roles(
@@ -816,6 +931,33 @@ class DocumentWorkflowActionView(APIView):
             )
 
         return Response(DocumentSerializer(document, context={"request": request}).data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _notify_returners(document, actor):
+        """
+        Hujjatni tuzatishga qaytargan foydalanuvchilarga qayta yuborilgani
+        haqida xabar beradi.
+
+        Qaytargan odam zanjirning boshiga qaytgan hujjatni o'z navbatida yana
+        ko'radi, lekin bu bir necha bosqichdan keyin bo'ladi — u vaqtgacha
+        so'rov unutilib qolmasin. Filial bo'yicha umumiy xabar bu yerda
+        yetarli emas: qaytargan rol markaziy bo'lishi mumkin.
+        """
+        returner_ids = set(
+            DocumentApproval.objects.filter(document=document, action="return")
+            .exclude(approver__isnull=True)
+            .exclude(approver_id=actor.id)
+            .values_list("approver_id", flat=True)
+        )
+        if not returner_ids:
+            return
+
+        notify_users(
+            list(User.objects.filter(id__in=returner_ids, is_active=True)),
+            "Qaytarilgan hujjat qayta yuborildi",
+            f"{document.doc_number} hujjati tuzatilib qayta jo'natildi — zanjir arxitekturadan boshlanadi.",
+            "info",
+        )
 
 
 class DocumentArchiveToggleView(APIView):
@@ -949,6 +1091,62 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
             {"doc_number": document.doc_number, "branch_id": document.branch_id},
         )
         return super().destroy(request, *args, **kwargs)
+
+
+class DocumentCommentListCreateView(generics.ListCreateAPIView):
+    """
+    Hujjat bo'yicha yozishma — ro'yxat va yangi izoh.
+
+    Muzlatish bu yerga TEGISHLI EMAS. Aynan muzlagan hujjat haqida gaplashish
+    kerak bo'ladi: xaridlar bo'limi kamchilikni ko'radi, tuzatishni esa filial
+    rahbari kiritadi. Izoh hujjat mazmunini o'zgartirmaydi, shuning uchun
+    `ensure_document_editable` chaqirilmaydi.
+    """
+
+    serializer_class = DocumentCommentSerializer
+    # Nazorat roli uchun istisno: kuzatuvini qayd eta olmaydigan nazoratning
+    # ma'nosi qolmaydi. SoD buzilmaydi — izoh qaror emas, hujjat mazmunini
+    # o'zgartirmaydi va muallifi bilan birga audit izi qoldiradi.
+    control_role_may_write = True
+
+    def get_queryset(self):
+        return branch_scope(
+            DocumentComment.objects.select_related("author", "document", "document__branch"),
+            self.request.user,
+            "document__branch",
+        ).filter(document_id=self.kwargs["pk"])
+
+    def perform_create(self, serializer):
+        # Ro'yxat filial bo'yicha filtrlanadi; yozish ham shunday cheklanishi
+        # kerak, aks holda begona filial hujjatiga izoh yozib bo'lardi.
+        document = branch_scope(
+            Document.objects.select_related("branch", "created_by"), self.request.user
+        ).filter(pk=self.kwargs["pk"]).first()
+        if not document:
+            raise exceptions.NotFound("Hujjat topilmadi")
+
+        comment = serializer.save(document=document, author=self.request.user)
+        create_audit_log(
+            self.request,
+            "document_comment_created",
+            "Document",
+            document.id,
+            {"doc_number": document.doc_number, "branch_id": document.branch_id},
+        )
+        notify_branch_roles(
+            document.branch,
+            {"branch_manager", "procurement", "admin"},
+            "Hujjatga yangi izoh",
+            f"{document.doc_number} hujjatiga izoh yozildi: {comment.text[:120]}",
+            "info",
+        )
+        if document.created_by_id and document.created_by_id != self.request.user.id:
+            notify_users(
+                [document.created_by],
+                "Hujjatingizga izoh yozildi",
+                f"{document.doc_number}: {comment.text[:120]}",
+                "info",
+            )
 
 
 # --- Purchase Order Views ---

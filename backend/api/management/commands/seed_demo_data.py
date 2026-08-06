@@ -15,6 +15,7 @@ from api.models import (
     Contract,
     Document,
     DocumentApproval,
+    DocumentComment,
     DocumentFile,
     InventoryItem,
     Invoice,
@@ -58,6 +59,7 @@ class Command(BaseCommand):
         addresses = self._seed_addresses()
         documents = self._seed_documents(branches, sites, users)
         self._seed_document_approvals(documents, users)
+        self._seed_document_comments(documents, users)
         self._seed_purchase_orders(documents, suppliers, materials)
         contracts = self._seed_contracts(documents, suppliers)
         invoices = self._seed_invoices(documents, contracts)
@@ -643,6 +645,20 @@ class Command(BaseCommand):
                 "total_amount": Decimal("62000000.00"),
                 "notes": "To'lov jarayonida.",
             },
+            # Yangi hujjatlar oxiriga qo'shiladi: keyingi seed'lar hujjatlarga
+            # indeks bo'yicha murojaat qiladi (`documents[3]` va h.k.).
+            {
+                "doc_number": "PR-20260709-0007",
+                "doc_type": "purchase_request",
+                "status": "revision",
+                "title": "Tuzatishga qaytarilgan so'rov",
+                "description": "Miqdor ombor qoldig'i bilan solishtirilishi kerak.",
+                "created_by": prorab,
+                "site": sites[0],
+                "branch": branch_main,
+                "total_amount": Decimal("34000000.00"),
+                "notes": "Xaridlar bo'limi qaytardi.",
+            },
         ]
 
         documents = []
@@ -667,6 +683,7 @@ class Command(BaseCommand):
             (documents[7], procurement, "approved", "Qabul qilish dalolatnomasi tayyor."),
             (documents[10], site_engineer, "approved", "Farg'ona filialiga mos."),
             (documents[11], procurement, "approved", "Yangi filial shartnomasi ma'qullandi."),
+            (documents[13], procurement, "return", "Miqdor ombor qoldig'idan ko'p — qayta hisoblang."),
         ]
         for document, approver, action, comment in approvals:
             DocumentApproval.objects.get_or_create(
@@ -675,6 +692,21 @@ class Command(BaseCommand):
                 action=action,
                 defaults={"comment": comment},
             )
+
+    def _seed_document_comments(self, documents, users):
+        """Hujjat bo'yicha yozishma — qaror emas, oddiy suhbat."""
+        procurement = self._user_by_email(users, "procurement@eombor.uz")
+        prorab = self._user_by_email(users, "prorab@eombor.uz")
+        control = self._user_by_email(users, "control@eombor.uz")
+        comments = [
+            (documents[13], procurement, "Sement miqdori ombordagi qoldiqdan ko'p ko'rinadi, tekshirib ko'ring."),
+            (documents[13], prorab, "Qoldiqni qayta sanadik, so'rov tuzatildi."),
+            # Nazorat roli hujjatni o'zgartira olmaydi, lekin kuzatuvini qayd
+            # etadi — buning uchun izoh unga ochiq.
+            (documents[3], control, "Ta'minotchi narxi bozor narxidan yuqori, asos so'raldi."),
+        ]
+        for document, author, text in comments:
+            DocumentComment.objects.get_or_create(document=document, author=author, text=text)
 
     def _seed_purchase_orders(self, documents, suppliers, materials):
         po_specs = [

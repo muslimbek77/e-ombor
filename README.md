@@ -4,7 +4,7 @@
 ![DRF](https://img.shields.io/badge/DRF-3.15-A30000)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/testlar-84%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/testlar-143%20passing-2ea44f)
 
 Qurilish tashkilotlari uchun ombor, hujjat aylanishi va moliya boshqaruvi
 platformasi. Filiallar, qurilish obyektlari va omborlar bo'yicha
@@ -15,10 +15,10 @@ bitta zanjirda kuzatiladi.
 
 | | |
 |---|---|
-| Backend | Django 4.2 + DRF, JWT autentifikatsiya, 50 endpoint, 21 model |
+| Backend | Django 4.2 + DRF, JWT autentifikatsiya, 51 endpoint, 22 model |
 | Frontend | React 19 + TypeScript + Vite, TanStack Query, Tailwind v4 |
 | Baza | SQLite (dev) / PostgreSQL (prod) |
-| Testlar | 84 ta (`python manage.py test api`) |
+| Testlar | 143 ta (`python manage.py test api`) |
 
 > **Tizim mantiqi to'liq bayon qilingan:** [`docs/TIZIM.md`](docs/TIZIM.md) —
 > rol matritsasi, filial izolyatsiyasi qoidasi, hujjat oqimi, ombor va moliya
@@ -81,11 +81,13 @@ bo'lishi mumkin.
 |---|---|
 | Admin | Hammasi |
 | Markaziy rol (`ceo`, `procurement`, `anticorruption`) | Hammasi — qaror uchun butun manzara kerak |
-| Filiali bor xodim | Faqat o'z filiali |
+| Zanjir bosqichi (`architecture`, `accountant`) | Hammasi — o'z navbatidagi hujjatni ko'rishi shart |
+| Filiali bor xodim (shu jumladan `warehouse`) | Faqat o'z filiali |
 | Filiali yo'q hisob | Hech nima |
 
-Markaziy rollar uchun bu **faqat ko'rish** doirasi — yozish huquqi yuqoridagi
-jadval bilan alohida tekshiriladi.
+Bu **faqat ko'rish** doirasi — yozish huquqi yuqoridagi jadval bilan alohida
+tekshiriladi. Omborchi bu yerda filialga bog'langan bo'lib qoladi: u tovarni
+jismonan qabul qiladi.
 
 Chegaralash ro'yxat va tafsilot endpointlarida bir xil ishlaydi — id ni
 taxmin qilib begona filial yozuviga kirib bo'lmaydi.
@@ -94,21 +96,27 @@ taxmin qilib begona filial yozuviga kirib bo'lmaydi.
 
 ## Hujjat oqimi
 
-`Document` — o'nta holatli avtomat. Har bir o'tish aniq rol talab qiladi.
+`Document` — o'n bir holatli avtomat. Har bir o'tish aniq rol talab qiladi.
 
 ```mermaid
 stateDiagram-v2
     [*] --> created
     created --> architecture: submit (filial rahbari, prorab, xaridlar)
+    revision --> architecture: submit (filial rahbari, prorab, xaridlar)
     architecture --> ceo: approve (architecture)
+    architecture --> revision: return
     architecture --> rejected: reject
     ceo --> procurement: approve (ceo)
+    ceo --> revision: return
     ceo --> rejected: reject
     procurement --> anticorruption: approve (procurement)
+    procurement --> revision: return
     procurement --> rejected: reject
     anticorruption --> accountant: approve (anticorruption)
+    anticorruption --> revision: return
     anticorruption --> rejected: reject
     accountant --> delivering: approve (accountant)
+    accountant --> revision: return
     accountant --> rejected: reject
     delivering --> received: advance (warehouse)
     received --> closed: close (warehouse, prorab)
@@ -116,8 +124,14 @@ stateDiagram-v2
     closed --> [*]
 ```
 
-Rad etishda sabab majburiy. Har o'tish `DocumentApproval` yozuvi va audit
+Rad etish (`reject`) va tuzatishga qaytarishda (`return`) sabab majburiy.
+`return` hujjatni `revision` ga tushiradi: u tahrirlanadi va qayta
+yuborilganda zanjir arxitekturadan boshlanadi. `advance` esa xarid qatorlarini
+ombor qoldig'iga kirim qiladi. Har o'tish `DocumentApproval` yozuvi va audit
 logi qoldiradi. `admin` har qanday o'tishni bajara oladi.
+
+Hujjat bo'yicha yozishma alohida: `documents/<id>/comments/` — izoh muzlagan
+hujjatda ham yoziladi va tahrirlanmaydi.
 
 ---
 
@@ -251,7 +265,7 @@ python manage.py test api
 | Fayl | Qamrov |
 |---|---|
 | `api/tests_stock_movements.py` | Ombor harakatlari, satr qulflash, yetarsiz qoldiq (30 test) |
-| `api/tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, tasdiqlash zanjiri, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (54 test) |
+| `api/tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, nazorat rolining yozish taqiqi va SoD, tasdiqlash zanjiri, hujjat muzlatilishi, izohlar, tuzatishga qaytarish, qabul, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (113 test) |
 
 `tests_api_contract.py` da har bir tekshiruv **kutilgan** xulqni tasdiqlaydi.
 Yiqilgan test — tuzatilishi kerak bo'lgan xato, testni moslashtirish emas.
@@ -324,13 +338,13 @@ e-ombor/
 ## Bajarilgan va rejadagi ishlar
 
 - [x] Rol asosidagi dashboard va navigatsiya
-- [x] Hujjat aylanishi — filial rahbaridan omborgacha 10 holatli tasdiqlash zanjiri
+- [x] Hujjat aylanishi — filial rahbaridan omborgacha 11 holatli tasdiqlash zanjiri
 - [x] Ombor moduli — kirim/chiqim/ko'chirish, qoldiq nazorati, kam zaxira ogohlantirishi
 - [x] Obyekt va filial kuzatuvi
 - [x] Moliya — shartnoma, hisob-faktura, to'lov zanjiri
 - [x] CSV eksport (hujjat, inventar, murojaat)
 - [x] Audit log va bildirishnomalar
-- [x] API shartnoma testlari (75 test)
+- [x] API shartnoma testlari (113 test)
 - [ ] Frontend testlari
 - [ ] DRF throttling va production sozlamalari
 - [ ] e-imzo integratsiyasi — raqamli imzo bilan tasdiqlash

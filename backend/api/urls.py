@@ -25,6 +25,7 @@ urlpatterns = [
     path('documents/<int:pk>/', views.DocumentDetailView.as_view(), name='document-detail'),
     path('documents/<int:pk>/workflow/', views.DocumentWorkflowActionView.as_view(), name='document-workflow'),
     path('documents/<int:pk>/archive/', views.DocumentArchiveToggleView.as_view(), name='document-archive-toggle'),
+    path('documents/<int:pk>/comments/', views.DocumentCommentListCreateView.as_view(), name='document-comment-list'),
     
     # Document Files
     path('documents/<int:doc_pk>/files/', views.DocumentFileUploadView.as_view(), name='document-file-upload'),

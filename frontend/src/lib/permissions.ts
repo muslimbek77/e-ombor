@@ -14,8 +14,12 @@ export const ADMIN_ROLES: UserRole[] = ["admin"];
 /**
  * Tashkilot bo'ylab ko'radigan rollar. Bu faqat KO'RISH doirasi — yozish
  * huquqi quyidagi to'plamlar bilan aniqlanadi va bunga bog'liq emas.
+ *
+ * `architecture` va `accountant` zanjir bosqichi bo'lgani uchun shu yerda:
+ * o'z navbatidagi hujjatni ko'ra olmasa zanjir to'xtab qolardi. `warehouse`
+ * esa yo'q — u tovarni jismonan qabul qiladi, ya'ni filialga bog'langan.
  */
-export const GLOBAL_SCOPE_ROLES: UserRole[] = ["admin", "ceo", "procurement", "anticorruption"];
+export const GLOBAL_SCOPE_ROLES: UserRole[] = ["admin", "ceo", "procurement", "anticorruption", "architecture", "accountant"];
 export const ARCHIVE_ROLES: UserRole[] = ["admin", "procurement", "branch_manager"];
 export const STOCK_MOVEMENT_ROLES: UserRole[] = ["admin", "warehouse"];
 /** Filial rahbari so'rovning material qatorlarini o'zi to'ldiradi. */

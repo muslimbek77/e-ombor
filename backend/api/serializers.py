@@ -11,6 +11,7 @@ from .models import (
     Contract,
     Document,
     DocumentApproval,
+    DocumentComment,
     DocumentFile,
     InventoryItem,
     Invoice,
@@ -145,6 +146,29 @@ class DocumentApprovalSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class DocumentCommentSerializer(serializers.ModelSerializer):
+    """
+    Hujjat bo'yicha izoh.
+
+    `document` va `author` so'rovdan olinmaydi — birinchisi URL dan, ikkinchisi
+    tokendan keladi. Aks holda izohni begona hujjatga yoki boshqa odam nomidan
+    yozib bo'lardi.
+    """
+
+    author_name = serializers.CharField(source="author.full_name", read_only=True)
+
+    class Meta:
+        model = DocumentComment
+        fields = ["id", "document", "text", "author", "author_name", "created_at"]
+        read_only_fields = ["id", "document", "author", "author_name", "created_at"]
+
+    def validate_text(self, value):
+        text = (value or "").strip()
+        if not text:
+            raise serializers.ValidationError("Izoh matni bo'sh bo'lmasligi kerak")
+        return text
+
+
 class DocumentSerializer(serializers.ModelSerializer):
     """Hujjatlar serializeri."""
 
@@ -222,10 +246,16 @@ class DocumentWorkflowSerializer(serializers.Serializer):
             "advance",
             "close",
             "reject",
+            "return",
             "reopen",
         ]
     )
     comment = serializers.CharField(required=False, allow_blank=True)
+    # Faqat `advance` (yetkazilmoqda → qabul qilindi) uchun: xarid qatorlari
+    # qaysi omborga kirim bo'ladi. Filialda bitta ombor bo'lsa u o'zi topiladi.
+    warehouse = serializers.PrimaryKeyRelatedField(
+        queryset=Warehouse.objects.all(), required=False, allow_null=True
+    )
 
 
 class ControlRoleSeparationMixin:

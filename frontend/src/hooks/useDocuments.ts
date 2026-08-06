@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createDocument,
+  createDocumentComment,
+  documentCommentsQueryKey,
   documentFilesQueryKey,
   documentQueryKey,
   documentsQueryKey,
   exportDocuments,
   getDocument,
+  getDocumentComments,
   getDocumentFiles,
   getDocuments,
   performWorkflowAction,
@@ -70,6 +73,23 @@ export function useToggleArchive() {
       queryClient.setQueryData(documentQueryKey(document.id), document);
       return queryClient.invalidateQueries({ queryKey: documentsQueryKey });
     },
+  });
+}
+
+export function useDocumentComments(documentId: number) {
+  return useQuery({
+    queryKey: documentCommentsQueryKey(documentId),
+    queryFn: () => getDocumentComments(documentId),
+    select: (response) => response.results,
+    enabled: Number.isInteger(documentId) && documentId > 0,
+  });
+}
+
+export function useCreateDocumentComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createDocumentComment,
+    onSuccess: (_, variables) => queryClient.invalidateQueries({ queryKey: documentCommentsQueryKey(variables.documentId) }),
   });
 }
 

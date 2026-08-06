@@ -7,13 +7,16 @@ function formatSum(value: string) {
   return `${currencyFormatter.format(Number(value))} so'm`;
 }
 
+// Manba — `types/document.ts: DocStatus`. Zanjirga yangi holat qo'shilsa bu
+// yerga ham qo'shiladi, aks holda nishon kulrang "noma'lum" bo'lib qoladi.
 const DOCUMENT_STATUS_STYLES: Record<string, string> = {
   created: "bg-gray-100 text-gray-600",
+  revision: "bg-yellow-50 text-yellow-700",
   architecture: "bg-blue-50 text-blue-700",
   ceo: "bg-indigo-50 text-indigo-700",
-  approved: "bg-teal-50 text-teal-700",
-  contract: "bg-purple-50 text-purple-700",
-  payment: "bg-amber-50 text-amber-700",
+  procurement: "bg-lime-50 text-lime-700",
+  anticorruption: "bg-orange-50 text-orange-700",
+  accountant: "bg-amber-50 text-amber-700",
   delivering: "bg-cyan-50 text-cyan-700",
   received: "bg-lime-50 text-lime-700",
   closed: "bg-green-50 text-green-700",

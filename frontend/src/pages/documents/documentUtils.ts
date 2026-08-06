@@ -15,6 +15,7 @@ export function docTypeLabel(docType: string) {
 export const STATUS_FILTERS = [
   { value: "all", label: "Barchasi" },
   { value: "created", label: "Yaratildi" },
+  { value: "revision", label: "Tuzatishda" },
   { value: "architecture", label: "Arxitekturada" },
   { value: "ceo", label: "Raisda" },
   { value: "procurement", label: "Xaridlarda" },
@@ -29,16 +30,30 @@ export const STATUS_FILTERS = [
 /**
  * Hujjat faqat shu holatlarda tahrirlanadi — manba `backend/api/workflow.py`
  * (`EDITABLE_STATUSES`). Zanjir boshlangach hujjat muzlaydi: server boshqa
- * holatda 409 qaytaradi. Tuzatish yo'li — `reject`, so'ng `reopen`.
+ * holatda 409 qaytaradi. Tuzatish yo'li — `return` (yoki `reject`), so'ng
+ * tuzatib qayta `submit`.
  */
-export const EDITABLE_STATUSES: DocStatus[] = ["created", "rejected"];
+export const EDITABLE_STATUSES: DocStatus[] = ["created", "revision", "rejected"];
 
 export function isDocumentEditable(status: DocStatus) {
   return EDITABLE_STATUSES.includes(status);
 }
 
+/**
+ * Izohsiz yuborilmaydigan amallar — server ikkalasida ham 400 qaytaradi
+ * (`workflow.py: COMMENT_REQUIRED_ACTIONS`).
+ */
+export const COMMENT_REQUIRED_ACTIONS: WorkflowAction[] = ["reject", "return"];
+
+export function requiresComment(action: WorkflowAction) {
+  return COMMENT_REQUIRED_ACTIONS.includes(action);
+}
+
 const STATUS_STYLES: Record<DocStatus, string> = {
   created: "bg-gray-100 text-gray-600",
+  // Tuzatishda — hujjat egasidan harakat kutayotgan yagona holat, shuning
+  // uchun ro'yxatda ajralib turadi.
+  revision: "bg-yellow-50 text-yellow-700",
   architecture: "bg-blue-50 text-blue-600",
   ceo: "bg-blue-50 text-blue-600",
   procurement: "bg-lime-50 text-lime-700",
@@ -62,6 +77,8 @@ const ACTION_LABELS: Record<WorkflowAction, string> = {
   advance: "Keyingi bosqichga o'tkazish",
   close: "Yopish",
   reject: "Rad etish",
+  // "Rad etildi" emas, "tuzatib qayta yuboring" — farq shu ikki so'zda.
+  return: "Tuzatishga qaytarish",
   reopen: "Qayta ochish",
 };
 

@@ -9,9 +9,16 @@ faqat shu faylda ta'riflanadi.
 
 Bosqichlar ikki turga bo'linadi:
 
-  Tasdiqlash bosqichlari  — `approve` / `reject`. Mas'ul rol qaror qabul qiladi.
+  Tasdiqlash bosqichlari  — `approve` / `reject` / `return`. Mas'ul rol qaror
+                            qabul qiladi.
   Bajarish bosqichlari    — `advance` / `close`. Qaror emas, faktni qayd etish
                             (tovar keldi, ombor qabul qildi).
+
+`reject` va `return` ning farqi mahsulot ma'nosida: birinchisi "rad etildi",
+ikkinchisi "tuzatib qayta yuboring". Ikkalasi ham hujjatni tahrirlanadigan
+holatga tushiradi, lekin `return` dan keyin zanjir arxitekturadan qaytadan
+boshlanadi — summa yoki qatorlar o'zgargan bo'lsa oldingi tasdiqlar boshqa
+hujjatga tegishli bo'lib qoladi, muzlatish aynan shuning uchun kiritilgan.
 
 `admin` har bir to'plamda ochiq yozilgan, garchi `is_admin()` tekshiruvi
 baribir birinchi bo'lib ishlasa ham — qoidani o'qiyotgan odam uchun aniqroq.
@@ -25,26 +32,40 @@ WORKFLOW_RULES = {
             "roles": {"branch_manager", "prorab", "procurement", "admin"},
         },
     },
+    # Tuzatishga qaytarilgan hujjat. `created` bilan bir xil amal, lekin alohida
+    # holat: ro'yxatda "yangi so'rov" bilan aralashib ketmasligi kerak, va
+    # qaytargan foydalanuvchi qayta yuborilganini bilib turishi kerak.
+    "revision": {
+        "submit": {
+            "next_status": "architecture",
+            "roles": {"branch_manager", "prorab", "procurement", "admin"},
+        },
+    },
     "architecture": {
         "approve": {"next_status": "ceo", "roles": {"architecture", "admin"}},
+        "return": {"next_status": "revision", "roles": {"architecture", "admin"}},
         "reject": {"next_status": "rejected", "roles": {"architecture", "admin"}},
     },
     "ceo": {
         "approve": {"next_status": "procurement", "roles": {"ceo", "admin"}},
+        "return": {"next_status": "revision", "roles": {"ceo", "admin"}},
         "reject": {"next_status": "rejected", "roles": {"ceo", "admin"}},
     },
     # Xaridlar bo'limi ombor qoldig'ini ko'rgan holda qaror qabul qiladi.
     "procurement": {
         "approve": {"next_status": "anticorruption", "roles": {"procurement", "admin"}},
+        "return": {"next_status": "revision", "roles": {"procurement", "admin"}},
         "reject": {"next_status": "rejected", "roles": {"procurement", "admin"}},
     },
     # Korrupsiyaga qarshi nazorat — to'lovdan OLDIN. Keyin tekshirish kech.
     "anticorruption": {
         "approve": {"next_status": "accountant", "roles": {"anticorruption", "admin"}},
+        "return": {"next_status": "revision", "roles": {"anticorruption", "admin"}},
         "reject": {"next_status": "rejected", "roles": {"anticorruption", "admin"}},
     },
     "accountant": {
         "approve": {"next_status": "delivering", "roles": {"accountant", "admin"}},
+        "return": {"next_status": "revision", "roles": {"accountant", "admin"}},
         "reject": {"next_status": "rejected", "roles": {"accountant", "admin"}},
     },
     # `delivering` va `received` da `reject` ataylab yo'q: tovar yo'lga chiqqach
@@ -82,8 +103,17 @@ ROLES_CONFLICTING_WITH_CONTROL = CHAIN_ROLES - {CONTROL_ROLE}
 # Hujjat (va uning material qatorlari) faqat shu holatlarda tahrirlanadi.
 # Zanjir boshlangach summa yoki qatorlar o'zgarsa, allaqachon berilgan
 # tasdiqlar aslida boshqa hujjatga tegishli bo'lib qoladi — tasdiqlash
-# zanjirining butun qiymati shunda. Tuzatish yo'li: `reject`, so'ng `reopen`.
-EDITABLE_STATUSES = {"created", "rejected"}
+# zanjirining butun qiymati shunda. Tuzatish yo'li: `return` (yoki `reject`),
+# so'ng tuzatib qayta `submit`.
+EDITABLE_STATUSES = {"created", "revision", "rejected"}
+
+# Izohsiz bajarilmaydigan amallar. Ikkalasi ham hujjatni orqaga qaytaradi —
+# nima tuzatilishi kerakligini aytmasdan qaytarish foydalanuvchini boshi
+# berk ko'chaga olib boradi.
+COMMENT_REQUIRED_ACTIONS = {
+    "reject": "Rad etishda sabab kiritish majburiy",
+    "return": "Tuzatishga qaytarishda sabab kiritish majburiy",
+}
 
 
 def is_editable(status):

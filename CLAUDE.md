@@ -14,7 +14,7 @@ kod izohlari o'zbekcha.
 ```bash
 # Backend
 cd backend && source venv/bin/activate
-python manage.py test api          # 111 test — o'zgarishdan keyin shu yuritiladi
+python manage.py test api          # 143 test — o'zgarishdan keyin shu yuritiladi
 python manage.py migrate
 python manage.py seed_demo_data    # demo to'plam + demo loginlar
 python manage.py runserver 0.0.0.0:3000
@@ -61,9 +61,26 @@ kerak bo'lsa u `views.DEFAULT_PERMISSIONS` USTIGA qo'shiladi, o'rniga emas.
 Istisno kerak bo'lsa view'ga `control_role_may_write = True` yoziladi. Buni
 `tests_api_contract.py` urls.py bo'yicha tekshiradi.
 
-**Hujjat `created` va `rejected` dan tashqarida muzlaydi.** Tahrirlash va
-o'chirish 409 qaytaradi — admin ham istisno emas. Xuddi shu `PurchaseOrder`
-qatorlariga tegishli. Holatlar ro'yxati `workflow.py: EDITABLE_STATUSES`.
+**Hujjat `created`, `revision` va `rejected` dan tashqarida muzlaydi.**
+Tahrirlash va o'chirish 409 qaytaradi — admin ham istisno emas. Xuddi shu
+`PurchaseOrder` qatorlariga tegishli. Holatlar ro'yxati
+`workflow.py: EDITABLE_STATUSES`. Muzlatish izohga (`DocumentComment`) va
+fayl biriktirishga tegishli emas: aynan muzlagan hujjat haqida gaplashish
+kerak bo'ladi.
+
+**`return` — `reject` emas.** Har bir tasdiqlash bosqichida `return` amali bor:
+hujjat `revision` ga tushadi, tuzatiladi va `submit` bilan zanjirni
+arxitekturadan qaytadan boshlaydi. Qaytadan boshlanishi ataylab — summa
+o'zgargan bo'lsa oldingi tasdiqlar boshqa hujjatga tegishli bo'lib qoladi.
+`reject` va `return` da izoh majburiy (`workflow.py:
+COMMENT_REQUIRED_ACTIONS`).
+
+**Qabul qoldiqni o'zgartiradi.** `delivering → received` (`advance`) hujjatning
+xarid qatorlarini omborga kirim qiladi (`views.py: receive_purchase_items`) —
+status va `StockMovement` bitta transaksiyada. Qatorlari bor hujjatda so'rovdagi
+`warehouse` majburiy va taxmin qilinmaydi (filialda bitta ombor bo'lsa ham):
+xato kirim keyin faqat teskari harakat bilan tuzatiladi. Qatorsiz hujjatda
+faqat status o'zgaradi.
 
 **Ombor harakati o'chirilmaydi.** `stock-movements/` da tafsilot endpointi
 ataylab yo'q. Xato kiritilgan harakat teskari harakat bilan tuzatiladi.

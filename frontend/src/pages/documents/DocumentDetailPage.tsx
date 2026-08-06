@@ -1,10 +1,11 @@
-import { Archive, ArrowLeft, Building2, Calendar, FileText, Hash, MapPin, Paperclip, Pencil, Upload, Wallet } from "lucide-react";
+import { Archive, ArrowLeft, Building2, Calendar, FileText, Hash, MapPin, MessageSquare, Paperclip, Pencil, Send, Upload, Wallet } from "lucide-react";
 import { useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useDocument, useToggleArchive, useUpdateDocument, useWorkflowAction } from "../../hooks/useDocuments";
+import { useCreateDocumentComment, useDocument, useDocumentComments, useToggleArchive, useUpdateDocument, useWorkflowAction } from "../../hooks/useDocuments";
 import { useDocumentFiles, useUploadDocumentFile } from "../../hooks/useDocuments";
+import { useWarehouses } from "../../hooks/useWarehouses";
 import { DocumentForm } from "./DocumentForm";
-import { actionLabel, docTypeLabel, formatFileSize, isDocumentEditable, statusBadgeClass } from "./documentUtils";
+import { actionLabel, docTypeLabel, formatFileSize, isDocumentEditable, requiresComment, statusBadgeClass } from "./documentUtils";
 import { formatDateTime } from "../tickets/ticketUtils";
 import { formatBudget, formatDate } from "../objects/siteUtils";
 import { useIsControlRole } from "../../lib/permissions";
@@ -14,8 +15,11 @@ export default function DocumentDetailPage() {
   const { id } = useParams();
   const documentId = Number(id);
   const [isEditing, setIsEditing] = useState(false);
-  const [rejectingAction, setRejectingAction] = useState<WorkflowAction | null>(null);
+  // Izoh so'raydigan amal (`reject` yoki `return`) tasdiqlash panelini ochadi.
+  const [pendingAction, setPendingAction] = useState<WorkflowAction | null>(null);
   const [comment, setComment] = useState("");
+  const [receiptWarehouse, setReceiptWarehouse] = useState("");
+  const [newComment, setNewComment] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: document, isPending, isError } = useDocument(documentId);
@@ -24,6 +28,9 @@ export default function DocumentDetailPage() {
   const toggleArchive = useToggleArchive();
   const { data: files = [], isPending: isFilesPending } = useDocumentFiles(documentId);
   const uploadFile = useUploadDocumentFile();
+  const { data: comments = [], isPending: isCommentsPending } = useDocumentComments(documentId);
+  const createComment = useCreateDocumentComment();
+  const { data: warehouses = [] } = useWarehouses();
   const isReadOnly = useIsControlRole();
 
   if (!Number.isInteger(documentId) || documentId < 1) return <DetailState>Hujjat ID noto'g'ri.</DetailState>;
@@ -33,20 +40,51 @@ export default function DocumentDetailPage() {
   // Zanjirga kirgan hujjat muzlaydi (server: 409), nazorat roli esa umuman
   // yozmaydi (server: 403). Ikkalasida ham tugmani ko'rsatishning ma'nosi yo'q.
   const canEdit = !isReadOnly && isDocumentEditable(document.status);
+  // Qabulda xarid qatorlari omborga kirim bo'ladi va ombor taxmin qilinmaydi —
+  // filialda bittasi bo'lsa ham omborchi o'zi ko'rsatadi (server: 400).
+  // Qatorlari yo'q hujjatda ombor kerak emas, lekin buni bu yerdan bilib
+  // bo'lmaydi: shuning uchun tanlov taklif qilinadi, o'tkazib yuborsa ham
+  // bo'ladi.
+  const branchWarehouses = warehouses.filter((warehouse) => warehouse.branch === document.branch);
+  const isChoosingWarehouse = pendingAction === "advance";
 
-  function runAction(action: WorkflowAction, actionComment?: string) {
+  function resetActionPanel() {
+    setPendingAction(null);
+    setComment("");
+    setReceiptWarehouse("");
+  }
+
+  function runAction(action: WorkflowAction, actionComment?: string, warehouse?: number) {
     workflowAction.mutate(
-      { documentId, payload: { action, comment: actionComment } },
-      { onSuccess: () => { setRejectingAction(null); setComment(""); } },
+      { documentId, payload: { action, comment: actionComment, warehouse } },
+      { onSuccess: resetActionPanel },
     );
   }
 
   function handleActionClick(action: WorkflowAction) {
-    if (action === "reject") {
-      setRejectingAction(action);
+    // Izoh majburiy bo'lgan amallar va qabuldagi ombor tanlovi — ikkalasi ham
+    // avval panel ochadi, so'ng yuboriladi.
+    if (requiresComment(action) || action === "advance") {
+      setPendingAction(action);
       return;
     }
     runAction(action);
+  }
+
+  function confirmPendingAction() {
+    if (!pendingAction) return;
+    if (pendingAction === "advance") {
+      runAction(pendingAction, undefined, receiptWarehouse ? Number(receiptWarehouse) : undefined);
+      return;
+    }
+    runAction(pendingAction, comment.trim());
+  }
+
+  function handleCommentSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const text = newComment.trim();
+    if (!text) return;
+    createComment.mutate({ documentId, text }, { onSuccess: () => setNewComment("") });
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -93,7 +131,10 @@ export default function DocumentDetailPage() {
           </div>
 
           {updateDocument.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">O'zgarishlarni saqlab bo'lmadi.</p>}
-          {workflowAction.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">Amalni bajarib bo'lmadi.</p>}
+          {/* Server sababini aytadi ("ombor ko'rsatilishi shart" va h.k.) —
+              uni yashirib "amal bajarilmadi" deyish foydalanuvchini nima
+              qilish kerakligidan mahrum qiladi. */}
+          {workflowAction.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">{workflowErrorMessage(workflowAction.error)}</p>}
 
           {isEditing && canEdit ? (
             <>
@@ -112,7 +153,7 @@ export default function DocumentDetailPage() {
 
           {!canEdit && !isReadOnly && (
             <p className="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-500">
-              Hujjat tasdiqlash zanjiriga kirgan va tahrirlanmaydi. Tuzatish kerak bo'lsa hujjat rad etiladi va qayta ochiladi.
+              Hujjat tasdiqlash zanjiriga kirgan va tahrirlanmaydi. Tuzatish kerak bo'lsa bosqichdagi mas'ul uni tuzatishga qaytaradi — izoh esa istalgan holatda yoziladi.
             </p>
           )}
 
@@ -126,19 +167,39 @@ export default function DocumentDetailPage() {
                     type="button"
                     disabled={workflowAction.isPending}
                     onClick={() => handleActionClick(action)}
-                    className={`rounded-xl px-3 py-2 text-sm font-semibold disabled:opacity-60 ${action === "reject" ? "bg-red-50 text-red-700 hover:bg-red-100" : "bg-green-600 text-white hover:bg-green-700"}`}
+                    className={`rounded-xl px-3 py-2 text-sm font-semibold disabled:opacity-60 ${action === "reject" ? "bg-red-50 text-red-700 hover:bg-red-100" : action === "return" ? "bg-yellow-50 text-yellow-800 hover:bg-yellow-100" : "bg-green-600 text-white hover:bg-green-700"}`}
                   >
                     {actionLabel(action)}
                   </button>
                 ))}
               </div>
-              {rejectingAction && (
-                <div className="mt-3 space-y-2 rounded-xl border border-red-100 bg-red-50 p-3">
-                  <label className="block text-xs font-semibold text-red-700">Rad etish sababi (majburiy)</label>
-                  <textarea rows={2} value={comment} onChange={(event) => setComment(event.target.value)} className="w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20" />
+              {pendingAction && requiresComment(pendingAction) && (
+                <div className={`mt-3 space-y-2 rounded-xl border p-3 ${pendingAction === "reject" ? "border-red-100 bg-red-50" : "border-yellow-100 bg-yellow-50"}`}>
+                  <label className={`block text-xs font-semibold ${pendingAction === "reject" ? "text-red-700" : "text-yellow-800"}`}>
+                    {pendingAction === "reject" ? "Rad etish sababi (majburiy)" : "Nima tuzatilishi kerak (majburiy)"}
+                  </label>
+                  <textarea rows={2} value={comment} onChange={(event) => setComment(event.target.value)} className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-gray-900 outline-none ${pendingAction === "reject" ? "border-red-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-yellow-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20"}`} />
                   <div className="flex justify-end gap-2">
-                    <button type="button" onClick={() => { setRejectingAction(null); setComment(""); }} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-100">Bekor qilish</button>
-                    <button type="button" disabled={!comment.trim() || workflowAction.isPending} onClick={() => runAction(rejectingAction, comment.trim())} className="rounded-xl bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">Rad etish</button>
+                    <button type="button" onClick={resetActionPanel} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-100">Bekor qilish</button>
+                    <button type="button" disabled={!comment.trim() || workflowAction.isPending} onClick={confirmPendingAction} className={`rounded-xl px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60 ${pendingAction === "reject" ? "bg-red-600 hover:bg-red-700" : "bg-yellow-600 hover:bg-yellow-700"}`}>
+                      {actionLabel(pendingAction)}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {isChoosingWarehouse && (
+                <div className="mt-3 space-y-2 rounded-xl border border-green-100 bg-green-50 p-3">
+                  <label className="block text-xs font-semibold text-green-800">Qaysi omborga qabul qilindi</label>
+                  <select value={receiptWarehouse} onChange={(event) => setReceiptWarehouse(event.target.value)} className="w-full rounded-xl border border-green-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20">
+                    <option value="">Ombor tanlanmagan</option>
+                    {branchWarehouses.map((warehouse) => (
+                      <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-green-700">Xarid qatorlari shu ombor qoldig'iga kirim qilinadi — xato ombor keyin faqat teskari harakat bilan tuzatiladi. Hujjatda material qatorlari bo'lmasa ombor kerak emas.</p>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={resetActionPanel} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-100">Bekor qilish</button>
+                    <button type="button" disabled={workflowAction.isPending} onClick={confirmPendingAction} className="rounded-xl bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60">Qabul qilish</button>
                   </div>
                 </div>
               )}
@@ -162,6 +223,36 @@ export default function DocumentDetailPage() {
             </div>
           </section>
         )}
+
+        <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900"><MessageSquare size={18} className="text-gray-400" /> Izohlar</h2>
+          {isCommentsPending && <p className="text-sm text-gray-400">Yuklanmoqda...</p>}
+          {!isCommentsPending && comments.length === 0 && <p className="text-sm text-gray-400">Hozircha izoh yo'q</p>}
+          {comments.length > 0 && (
+            <div className="space-y-3">
+              {comments.map((item) => (
+                <div key={item.id} className="rounded-xl bg-gray-50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-gray-800">{item.author_name || "—"}</p>
+                    <p className="text-xs text-gray-400">{formatDateTime(item.created_at)}</p>
+                  </div>
+                  <p className="mt-1 whitespace-pre-line text-sm text-gray-700">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Muzlatish izohga tegishli emas: aynan muzlagan hujjat haqida
+              gaplashish kerak bo'ladi. Nazorat roli ham yoza oladi. */}
+          <form onSubmit={handleCommentSubmit} className="mt-4 space-y-2">
+            <textarea rows={2} value={newComment} onChange={(event) => setNewComment(event.target.value)} placeholder="Izoh yozing..." className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20" />
+            {createComment.isError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">Izohni saqlab bo'lmadi.</p>}
+            <div className="flex justify-end">
+              <button type="submit" disabled={!newComment.trim() || createComment.isPending} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60">
+                <Send size={15} /> {createComment.isPending ? "Yuborilmoqda..." : "Izoh qoldirish"}
+              </button>
+            </div>
+          </form>
+        </section>
 
         <section className="rounded-2xl bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-4">
@@ -194,6 +285,11 @@ export default function DocumentDetailPage() {
       </div>
     </main>
   );
+}
+
+function workflowErrorMessage(error: unknown) {
+  const serverError = (error as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+  return typeof serverError === "string" && serverError ? serverError : "Amalni bajarib bo'lmadi.";
 }
 
 function DocumentInformation({ document }: { document: NonNullable<ReturnType<typeof useDocument>["data"]> }) {

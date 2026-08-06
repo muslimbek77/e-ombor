@@ -1,6 +1,8 @@
 import api from "../lib/axios";
 import type {
   AppDocument,
+  DocumentComment,
+  DocumentCommentsResponse,
   DocumentCreatePayload,
   DocumentFilesResponse,
   DocumentUpdatePayload,
@@ -11,6 +13,7 @@ import type {
 export const documentsQueryKey = ["documents"] as const;
 export const documentQueryKey = (documentId: number) => [...documentsQueryKey, documentId] as const;
 export const documentFilesQueryKey = (documentId: number) => [...documentQueryKey(documentId), "files"] as const;
+export const documentCommentsQueryKey = (documentId: number) => [...documentQueryKey(documentId), "comments"] as const;
 
 export interface DocumentFilters {
   doc_type?: string;
@@ -46,6 +49,16 @@ export async function performWorkflowAction({ documentId, payload }: { documentI
 
 export async function toggleArchive({ documentId, archive }: { documentId: number; archive: boolean }): Promise<AppDocument> {
   const { data } = await api.post<AppDocument>(`/documents/${documentId}/archive/`, { archive });
+  return data;
+}
+
+export async function getDocumentComments(documentId: number): Promise<DocumentCommentsResponse> {
+  const { data } = await api.get<DocumentCommentsResponse>(`/documents/${documentId}/comments/`);
+  return data;
+}
+
+export async function createDocumentComment({ documentId, text }: { documentId: number; text: string }): Promise<DocumentComment> {
+  const { data } = await api.post<DocumentComment>(`/documents/${documentId}/comments/`, { text });
   return data;
 }
 

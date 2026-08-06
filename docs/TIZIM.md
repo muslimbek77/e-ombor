@@ -4,7 +4,7 @@ Bu hujjat platformaning ishlash mantiqini bir joyda bayon qiladi: kim nima
 qila oladi, hujjat qanday yo'ldan o'tadi, ma'lumot qanday chegaralanadi va
 nima tekshirilgan. Har bir da'vo `backend/api/tests_api_contract.py` va
 `backend/api/tests_stock_movements.py` dagi testlar bilan qo'llab-quvvatlangan
-(jami 111 ta test).
+(jami 143 ta test).
 
 ---
 
@@ -26,8 +26,8 @@ SQLite (dev) / PostgreSQL (prod)
 Frontend uch qatlamli: `api/` (axios chaqiruvlari) → `hooks/` (TanStack Query)
 → `pages/`. Har bir domen shu qolipni takrorlaydi.
 
-Backend bitta `api` ilovasidan iborat: `models.py` (21 model), `serializers.py`,
-`views.py` (50 endpoint), `urls.py`.
+Backend bitta `api` ilovasidan iborat: `models.py` (22 model), `serializers.py`,
+`views.py` (51 endpoint), `urls.py`.
 
 ---
 
@@ -46,9 +46,10 @@ Bular filialga bog'lanmagan, butun tizim uchun umumiy.
 
 **Hujjat oqimi**
 `Document` — markaziy obyekt. Unga `DocumentApproval` (tasdiqlash tarixi),
-`DocumentFile` (biriktirilgan fayllar), `PurchaseOrder` → `PurchaseOrderItem`,
-`Contract`, `Invoice` → `Payment` bog'lanadi. `Contract` va `Invoice` —
-`OneToOne`, ya'ni bitta hujjatda bitta shartnoma va bitta hisob-faktura.
+`DocumentComment` (yozishma), `DocumentFile` (biriktirilgan fayllar),
+`PurchaseOrder` → `PurchaseOrderItem`, `Contract`, `Invoice` → `Payment`
+bog'lanadi. `Contract` va `Invoice` — `OneToOne`, ya'ni bitta hujjatda bitta
+shartnoma va bitta hisob-faktura.
 
 **Operatsion yozuvlar**
 `InventoryItem` (ombordagi qoldiq, `warehouse + material` bo'yicha unikal),
@@ -174,6 +175,7 @@ Istisnolar `control_role_may_write = True` bilan belgilanadi:
 | Endpoint | Nega |
 |---|---|
 | `documents/<id>/workflow/` | Nazorat o'z bosqichida qaror qabul qiladi — asosiy vazifasi. Kim qaysi amalni bajarishi baribir `WORKFLOW_RULES` bilan tekshiriladi, ya'ni bu zanjirning boshqa bosqichini ochmaydi |
+| `documents/<id>/comments/` | Kuzatuvini qayd eta olmaydigan nazoratning ma'nosi qolmaydi. Izoh qaror emas: hujjat mazmunini o'zgartirmaydi, tahrirlanmaydi va muallifi bilan qoladi |
 | `auth/logout/`, `auth/change-password/`, `auth/user/`, `notifications/.../read/` | O'z hisobiga tegishli, ish ma'lumoti emas — yopilsa nazorat tizimdan chiqa ham olmasdi |
 
 **Vazifalar ajratilishi (SoD).** `anticorruption` roli zanjirning boshqa
@@ -215,16 +217,30 @@ ajratadi:
 | Foydalanuvchi | Ko'radigan ma'lumot |
 |---|---|
 | Admin (`admin` roli yoki `is_staff`) | Hammasi |
-| Markaziy rol — `ceo`, `procurement`, `anticorruption` | Hammasi |
+| Markaziy rol — `ceo`, `procurement`, `anticorruption`, `architecture`, `accountant` | Hammasi |
 | Filiali bor xodim | Faqat o'z filiali |
 | Filiali yo'q hisob | Hech nima (bo'sh ro'yxat) |
 
-Markaziy rollar (`views.py: GLOBAL_SCOPE_ROLES`) tashkilot bo'ylab qaror qabul
-qiladi: rais barcha filial hujjatlarini tasdiqlaydi, xaridlar bo'limi qaror
-qabul qilishda butun ombor holatiga tayanadi, nazorat esa tizimni to'liq
-ko'rmasa vazifasini bajara olmaydi. Bu **faqat ko'rish** doirasi — yozish
-huquqi 4-bo'limdagi to'plamlar bilan alohida tekshiriladi, va uni bu istisno
-kengaytirmaydi.
+Markaziy rollar (`views.py: GLOBAL_SCOPE_ROLES`) ikki sababga ko'ra shunday.
+
+Birinchisi — **tashkilot bo'ylab qaror**: rais barcha filial hujjatlarini
+tasdiqlaydi, xaridlar bo'limi qaror qabul qilishda butun ombor holatiga
+tayanadi, nazorat esa tizimni to'liq ko'rmasa vazifasini bajara olmaydi.
+
+Ikkinchisi — **zanjir bosqichi bo'lish**. `architecture` va `accountant`
+markaziy qaror qabul qilmaydi, lekin ikkalasi ham 6-bo'limdagi zanjirning
+bosqichi. Filialga bog'langanida begona filial hujjati ularga umuman
+ko'rinmasdi va `approve` 403 emas, **404** qaytarardi: filialda o'z
+arxitektori yoki buxgalteri bo'lmasa so'rov birinchi tasdiqdayoq o'lib
+qolardi. Zanjir bosqichi bo'lgan rol o'z navbatidagi hujjatni ko'rishi shart.
+
+`warehouse` ataylab bu ro'yxatda **yo'q**, garchi u ham zanjir bosqichi
+bo'lsa ham: omborchi tovarni jismonan qabul qiladi va qoldiqni o'zgartiradi,
+ya'ni uning ishi haqiqatan bitta filialda. Boshqa filial hujjatini qabul
+qilish urinishi 404 qaytaradi.
+
+Bularning hammasi **faqat ko'rish** doirasi — yozish huquqi 4-bo'limdagi
+to'plamlar bilan alohida tekshiriladi, va uni bu istisno kengaytirmaydi.
 
 Uchinchi qator muhim: yangi ro'yxatdan o'tgan hisobda filial yo'q, va u
 hech qanday ish ma'lumotini ko'rmaydi. Admin unga filial va rol bergandan
@@ -242,7 +258,7 @@ murojaatlarini, filialsiz esa faqat o'zi yaratganini ko'radi.
 
 ## 6. Hujjat oqimi
 
-`Document` — o'nta holatli avtomat. Har bir o'tish uchun aniq rol talab
+`Document` — o'n bir holatli avtomat. Har bir o'tish uchun aniq rol talab
 qilinadi. Qoidalar **faqat `api/workflow.py`** da ta'riflangan: haqiqiy
 tekshiruv (`views.py`) va frontendga qaytadigan `allowed_actions`
 (`serializers.py`) ikkalasi ham shu fayldan o'qiydi. Ilgari bu ikki nusxada
@@ -250,8 +266,8 @@ edi va ajralib qolsa foydalanuvchiga bosilganda 403 beradigan tugma
 ko'rinardi.
 
 Bosqichlar ikki turga bo'linadi: **tasdiqlash** bosqichlari (`approve` /
-`reject` — mas'ul rol qaror qabul qiladi) va **bajarish** bosqichlari
-(`advance` / `close` — qaror emas, faktni qayd etish).
+`return` / `reject` — mas'ul rol qaror qabul qiladi) va **bajarish**
+bosqichlari (`advance` / `close` — qaror emas, faktni qayd etish).
 
 Zanjirdagi to'rtta tasdiq — arxitektura, rais, xaridlar, nazorat — ketma-ket
 va chetlab o'tib bo'lmaydi. Nazorat (`anticorruption`) ataylab **buxgalteriyadan
@@ -261,15 +277,21 @@ oldin** turadi: to'lov ketgandan keyin tekshirishning ma'nosi yo'q.
 stateDiagram-v2
     [*] --> created: hujjat yaratildi
     created --> architecture: submit (filial rahbari, prorab, xaridlar)
+    revision --> architecture: submit (filial rahbari, prorab, xaridlar)
     architecture --> ceo: approve (architecture)
+    architecture --> revision: return (architecture)
     architecture --> rejected: reject (architecture)
     ceo --> procurement: approve (ceo)
+    ceo --> revision: return (ceo)
     ceo --> rejected: reject (ceo)
     procurement --> anticorruption: approve (procurement)
+    procurement --> revision: return (procurement)
     procurement --> rejected: reject (procurement)
     anticorruption --> accountant: approve (anticorruption)
+    anticorruption --> revision: return (anticorruption)
     anticorruption --> rejected: reject (anticorruption)
     accountant --> delivering: approve (accountant)
+    accountant --> revision: return (accountant)
     accountant --> rejected: reject (accountant)
     delivering --> received: advance (warehouse)
     received --> closed: close (warehouse, prorab)
@@ -283,15 +305,21 @@ to'g'ridan-to'g'ri aksi:
 | Joriy holat | Amal | Keyingi holat | Kim bajaradi |
 |---|---|---|---|
 | `created` | `submit` | `architecture` | filial rahbari, prorab, xaridlar |
+| `revision` | `submit` | `architecture` | filial rahbari, prorab, xaridlar |
 | `architecture` | `approve` | `ceo` | arxitektura |
+| `architecture` | `return` | `revision` | arxitektura |
 | `architecture` | `reject` | `rejected` | arxitektura |
 | `ceo` | `approve` | `procurement` | ceo |
+| `ceo` | `return` | `revision` | ceo |
 | `ceo` | `reject` | `rejected` | ceo |
 | `procurement` | `approve` | `anticorruption` | xaridlar |
+| `procurement` | `return` | `revision` | xaridlar |
 | `procurement` | `reject` | `rejected` | xaridlar |
 | `anticorruption` | `approve` | `accountant` | nazorat |
+| `anticorruption` | `return` | `revision` | nazorat |
 | `anticorruption` | `reject` | `rejected` | nazorat |
 | `accountant` | `approve` | `delivering` | buxgalter |
+| `accountant` | `return` | `revision` | buxgalter |
 | `accountant` | `reject` | `rejected` | buxgalter |
 | `delivering` | `advance` | `received` | omborchi |
 | `received` | `close` | `closed` | omborchi, prorab |
@@ -299,29 +327,76 @@ to'g'ridan-to'g'ri aksi:
 
 `admin` har qanday o'tishni bajara oladi — jadvalda alohida ko'rsatilmagan.
 
-Jadvalda yo'q narsa ham ma'noli: `delivering` va `received` holatlarida
-`reject` yo'q. Tovar yo'lga chiqqach yoki omborga kirgach hujjatni rad etib
-bo'lmaydi — bunday holat qoldiqni hujjat holatidan ajratib yuborardi.
-`closed` esa yakuniy: undan hech qayerga o'tilmaydi.
+Jadvalda yo'q narsa ham ma'noli: `delivering` va `received` holatlarida na
+`reject`, na `return` bor. Tovar yo'lga chiqqach yoki omborga kirgach hujjatni
+orqaga surib bo'lmaydi — bunday holat qoldiqni hujjat holatidan ajratib
+yuborardi. `closed` esa yakuniy: undan hech qayerga o'tilmaydi.
+
+### `return` — tuzatishga qaytarish
+
+`return` va `reject` ikkalasi ham hujjatni tahrirlanadigan holatga tushiradi,
+lekin mahsulot ma'nosida boshqa-boshqa: birinchisi "tuzatib qayta yuboring",
+ikkinchisi "rad etildi". Ilgari oraliq bosqichdagi mayda xatoni tuzatishning
+yagona yo'li so'rovni butunlay rad etish edi va bu hujjat muzlatilgandan keyin
+sezilarli bo'lib qoldi.
+
+`revision` ("TUZATISHDA") — alohida holat, `created` bilan aralashtirilmaydi:
+ro'yxatda u yangi so'rov emas, egasidan harakat kutayotgan so'rov.
+
+`revision` dan `submit` hujjatni yana `architecture` ga jo'natadi — **zanjir
+qaytadan boshlanadi**. Bu ataylab: summa yoki qatorlar o'zgargan bo'lsa
+oldingi tasdiqlar aslida boshqa hujjatga tegishli bo'lib qoladi. Muzlatish
+aynan shuning uchun kiritilgan, va `return` uni chetlab o'tmasligi kerak.
+
+Qaytargan foydalanuvchi hujjat qayta yuborilganda bildirishnoma oladi
+(`DocumentApproval` dagi `return` yozuvlaridan topiladi) — u zanjirning
+boshiga qaytgan so'rovni bir necha bosqichdan keyin ko'radi va u vaqtgacha
+uni unutib qo'ymasligi kerak.
 
 Qoidalar:
 
 - Holatda mavjud bo'lmagan amal → 400 (`"Bu holatda ushbu amal mavjud emas"`).
 - Roli mos kelmasa → 403.
-- **Rad etishda sabab majburiy** — izohsiz `reject` 400 qaytaradi.
+- **`reject` va `return` da sabab majburiy** — izohsiz 400 qaytadi
+  (`workflow.py: COMMENT_REQUIRED_ACTIONS`). Nima tuzatilishi kerakligini
+  aytmasdan qaytarish foydalanuvchini boshi berk ko'chaga olib boradi.
 - Har o'tish `DocumentApproval` yozuvi va audit logi qoldiradi.
 - Hujjat muallifi va filialdagi tegishli rollar bildirishnoma oladi.
 
+### Hujjatga bog'langan izohlar
+
+`DocumentComment` — hujjat bo'yicha yozishma: hujjat, muallif, matn, sana.
+Endpoint `documents/<id>/comments/` (ro'yxat va yaratish), ko'rish doirasi
+`branch_scope` bo'yicha (`document__branch`). Izoh **tahrirlanmaydi va
+o'chirilmaydi** — tafsilot endpointi ataylab yo'q, chunki keyin o'zgartirilgan
+yozishmaning dalil sifatidagi qiymati qolmaydi.
+
+`DocumentApproval.comment` dan farqi: u faqat holat o'zgarganda yoziladi va
+qarorning izohi hisoblanadi. Izoh esa qarorsiz gaplashish uchun — xaridlar
+bo'limi kamchilikni birinchi bo'lib ko'radi, lekin tuzatishni filial rahbari
+kiritadi (4-bo'lim), ya'ni ularga aytadigan joy kerak.
+
+Ikkita ataylab qilingan istisno:
+
+- **Muzlatish izohga tegishli emas.** Aynan muzlagan hujjat haqida gaplashish
+  kerak bo'ladi, shuning uchun izoh har qanday holatda yoziladi.
+- **Nazorat roli izoh yoza oladi** (`control_role_may_write`). Kuzatuvini qayd
+  eta olmaydigan nazoratning ma'nosi qolmaydi. SoD buzilmaydi: izoh qaror emas,
+  hujjat mazmunini o'zgartirmaydi va muallifi bilan birga audit izi qoldiradi.
+
 ### Muzlatish — zanjirga kirgan hujjat o'zgarmaydi
 
-Hujjat faqat `created` va `rejected` holatlarida tahrirlanadi va o'chiriladi
-(`workflow.py: EDITABLE_STATUSES`). Boshqa holatda server **409** qaytaradi.
+Hujjat faqat `created`, `revision` va `rejected` holatlarida tahrirlanadi va
+o'chiriladi (`workflow.py: EDITABLE_STATUSES`). Boshqa holatda server **409**
+qaytaradi.
 
 403 emas, 409: gap ruxsatda emas, hujjatning holatida — **admin ham** istisno
 emas. Ilgari holat umuman tekshirilmasdi, ya'ni tasdiqlangan, hatto `closed`
 hujjatning summasi ham o'zgartirilishi mumkin edi va arxitektura, rais,
 nazorat bergan tasdiq aslida boshqa hujjatga tegishli bo'lib qolardi. Tuzatish
-yo'li bitta: `reject`, so'ng `reopen` — bu izohi va tarixi bilan qayd etiladi.
+yo'li: bosqichdagi mas'ul `return` qiladi (yoki `reject`), egasi tuzatib qayta
+yuboradi — bularning hammasi izohi va tarixi bilan qayd etiladi. Izoh yozish
+esa muzlatishdan qat'i nazar ochiq.
 
 Cheklov `PurchaseOrder` va uning `PurchaseOrderItem` qatorlariga ham tegishli
 (yaratish, tahrirlash, o'chirish — uchalasi), chunki hujjat summasini aynan
@@ -361,6 +436,34 @@ Muhim tafsilotlar:
 - Yangi `InventoryItem` yaratish ham `IN` harakatini tug'diradi, shuning
   uchun u ham omborchi/admin huquqini talab qiladi.
 
+### Qabul — zanjir qoldiqqa ulanadigan joy
+
+`delivering → received` (`advance`) faqat statusni almashtirmaydi: hujjatning
+xarid qatorlari (`PurchaseOrderItem`) ombor qoldig'iga **kirim** bo'ladi. Har
+bir qator uchun `IN` harakati yoziladi, `reference_doc` esa hujjatga
+bog'lanadi — ya'ni kirim keyin tekshirilib, hujjatgacha izlanadi.
+
+Ilgari bu o'tish faqat status edi. Natijada zanjir yakunlangan, tovar omborda,
+lekin qoldiq eski — xaridlar bo'limi keyingi so'rov bo'yicha qaror qabul
+qilishda ko'radigan raqam zanjir natijasini aks ettirmasdi.
+
+Tafsilotlar:
+
+- Ombor `advance` payloadidagi `warehouse` maydonida ko'rsatiladi va
+  qatorlari bor hujjat uchun **majburiy** (aks holda 400). Filialda bitta
+  ombor bo'lsa ham taxmin qilinmaydi: tovarni qabul qilayotgan omborchi u
+  qayerga kirganini o'zi biladi, va noto'g'ri omborga tushgan kirim keyin
+  faqat teskari harakat bilan tuzatiladi — `StockMovement` o'chirilmaydi.
+- Ombor hujjat filialiga tegishli bo'lishi tekshiriladi; begonasi 400.
+- Kirim va status **bitta transaksiyada** — yarim bajarilgan qabul yo'q.
+  Qabul o'tmasa hujjat `delivering` da qoladi va `DocumentApproval` ham
+  yozilmaydi.
+- `PurchaseOrder` bo'lmasa yoki qatorlari bo'sh bo'lsa faqat status
+  o'zgaradi — bu xato emas (har bir hujjat xarid so'rovi emas), va bunda
+  ombor ham so'ralmaydi.
+- Amalni baribir `WORKFLOW_RULES` dagi rol tekshiradi: `advance` omborchi va
+  adminda — ya'ni qoldiqni o'zgartiradigan amal qoldiqqa mas'ul rolda qoladi.
+
 ---
 
 ## 8. Moliya zanjiri
@@ -387,8 +490,9 @@ hisob-faktura summasidan oshmasligi kerak. Aks holda 400.
 
 **Bildirishnoma** foydalanuvchiga tegishli va faqat egasiga ko'rinadi.
 Begona bildirishnomani o'qilgan deb belgilash 404 beradi. Yuboriladigan
-hodisalar: hujjat yaratilishi, holat o'zgarishi, kam zaxira, yangi murojaat,
-to'lov qayd etilishi, ro'yxatdan o'tish.
+hodisalar: hujjat yaratilishi, holat o'zgarishi, hujjatga izoh yozilishi,
+tuzatishga qaytarilgan hujjatning qayta yuborilishi (qaytargan foydalanuvchiga),
+kam zaxira, yangi murojaat, to'lov qayd etilishi, ro'yxatdan o'tish.
 
 **Audit log** yozish amallarini qayd etadi: kim, qachon, qaysi model, qaysi
 obyekt, qanday tafsilot, qaysi IP. Ko'rish doirasi filial bilan cheklangan
@@ -437,7 +541,7 @@ python manage.py test api
 | Fayl | Qamrov |
 |---|---|
 | `tests_stock_movements.py` | Ombor harakatlari, qulflash, yetarsiz qoldiq (30 test) |
-| `tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, nazorat rolining yozish taqiqi va SoD, tasdiqlash zanjiri, hujjat muzlatilishi, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (81 test) |
+| `tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, nazorat rolining yozish taqiqi va SoD, tasdiqlash zanjiri, hujjat muzlatilishi, filial izolyatsiyasi, raqam generatsiyasi, hujjat izohlari, tuzatishga qaytarish va qabul (113 test) |
 
 `tests_api_contract.py` da har bir tekshiruv **kutilgan** xulqni tasdiqlaydi.
 Yiqilgan test — tuzatilishi kerak bo'lgan xato, testni moslashtirish emas.
@@ -457,29 +561,14 @@ Quyidagilar hozircha bajarilmagan va keyingi bosqichga qoladi:
    uchun umumiy; filialga xos katalog kerak bo'lsa, model o'zgartirilishi
    kerak.
 
-3. **Hujjat oqimi orqaga qaytmaydi.** `rejected` dan `created` ga qaytish
-   bor, lekin oraliq holatdan bir qadam orqaga qaytish yo'q. Olti bosqichli
-   zanjirda bu sezilarli: oxirgi bosqichdagi mayda xato ham so'rovni butunlay
-   boshiga qaytaradi. Hujjat muzlatilgandan keyin bu sezilarliroq bo'ldi —
-   tuzatish uchun yagona yo'l `reject` + `reopen`.
-
-4. **Hujjatga bog'langan izoh yo'q.** Xaridlar bo'limi so'rovni birinchi
-   bosqichdan ko'radi va filial rahbariga tuzatish aytishi kerak (endi
-   tuzatishni faqat u kiritadi), lekin bu suhbat uchun tizimda joy yo'q —
-   `DocumentApproval.comment` faqat holat o'zgarganda yoziladi.
-
-5. **Qabul ombor qoldig'ini o'zgartirmaydi.** `delivering → received` faqat
-   statusni almashtiradi, `StockMovement` yaratmaydi. Ya'ni xaridlar bo'limi
-   qaror qabul qilishda ko'radigan qoldiq zanjir yakunini aks ettirmaydi.
-
-6. **Frontendda test yo'q.** Rol darvozalari faqat backendda avtomatik
+3. **Frontendda test yo'q.** Rol darvozalari faqat backendda avtomatik
    tekshiriladi; frontend nusxasi qo'lda moslashtiriladi.
 
-7. **Fayl yuklash antivirus tekshiruvisiz.** Faqat kengaytma (`.pdf`,
+4. **Fayl yuklash antivirus tekshiruvisiz.** Faqat kengaytma (`.pdf`,
    `.xlsx`, `.xls`, `.jpg`, `.jpeg`, `.png`) va hajm (10MB) tekshiriladi.
 
-8. **Fayl biriktirish muzlatishga bo'ysunmaydi.** Hujjatning o'zi va material
-   qatorlari `created`/`rejected` dan tashqarida yopiladi, lekin
-   `documents/<id>/files/` istalgan holatda ochiq. Bu ataylab: hisob-faktura
-   yoki dalolatnoma ko'pincha zanjir o'rtasida keladi va uni ilib qo'yish
-   hujjat mazmunini o'zgartirmaydi.
+5. **Fayl biriktirish muzlatishga bo'ysunmaydi.** Hujjatning o'zi va material
+   qatorlari `created`/`revision`/`rejected` dan tashqarida yopiladi, lekin
+   `documents/<id>/files/` istalgan holatda ochiq. Bu ataylab — izoh bilan bir
+   xil sababga ko'ra: hisob-faktura yoki dalolatnoma ko'pincha zanjir
+   o'rtasida keladi va uni ilib qo'yish hujjat mazmunini o'zgartirmaydi.

@@ -245,6 +245,7 @@ class Document(models.Model):
     # ikkalasi birga yangilanadi.
     STATUSES = [
         ('created', 'YARATILDI'),
+        ('revision', 'TUZATISHDA'),
         ('architecture', 'ARXITEKTURADA'),
         ('ceo', 'RAISDA'),
         ('procurement', 'XARIDLARDA'),
@@ -294,6 +295,34 @@ class DocumentApproval(models.Model):
     
     def __str__(self):
         return f"{self.document.doc_number} - {self.action}"
+
+
+class DocumentComment(models.Model):
+    """
+    Hujjat bo'yicha yozishma.
+
+    `DocumentApproval` dan farqi: u faqat holat o'zgarganda yoziladi va
+    qarorning izohi hisoblanadi. Bu yerda esa qarorsiz gaplashish mumkin —
+    xaridlar bo'limi kamchilikni birinchi bo'lib ko'radi, lekin tuzatishni
+    filial rahbari kiritadi, ya'ni ularga aytadigan joy kerak.
+
+    Izoh tahrirlanmaydi va o'chirilmaydi: yozishma tarixi keyin o'zgartirilsa
+    uning dalil sifatidagi qiymati qolmaydi.
+    """
+
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='document_comments')
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'document_comments'
+        # Yozishma xronologik o'qiladi — boshqa ro'yxatlardan farqli o'laroq
+        # eng eskisi birinchi.
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.document.doc_number} - {self.author_id}"
 
 
 class PurchaseOrder(models.Model):
