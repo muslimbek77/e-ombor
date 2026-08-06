@@ -1,12 +1,13 @@
 export type DocType = "purchase_request" | "contract" | "invoice";
 
+/** Zanjir manbasi — `backend/api/workflow.py`. */
 export type DocStatus =
   | "created"
   | "architecture"
   | "ceo"
-  | "approved"
-  | "contract"
-  | "payment"
+  | "procurement"
+  | "anticorruption"
+  | "accountant"
   | "delivering"
   | "received"
   | "closed"

@@ -67,44 +67,26 @@ from .serializers import (
     UserUpdateSerializer,
     WarehouseSerializer,
 )
+from .workflow import WORKFLOW_RULES
 
 
 ADMIN_ROLES = {"admin"}
+# Tashkilot bo'ylab ko'radigan rollar. Bu FAQAT ko'rish doirasi — yozish
+# huquqi quyidagi alohida to'plamlar bilan tekshiriladi va bu yerga bog'liq
+# emas. CEO va xaridlar bo'limi barcha filiallar bo'yicha qaror qabul qiladi,
+# nazorat roli esa butun tizimni ko'rmasa vazifasini bajara olmaydi.
+GLOBAL_SCOPE_ROLES = {"admin", "ceo", "procurement", "anticorruption"}
 ARCHIVE_ROLES = {"admin", "procurement", "branch_manager"}
 STOCK_MOVEMENT_ROLES = {"admin", "warehouse"}
-PURCHASE_ORDER_ROLES = {"admin", "procurement"}
+# Filial rahbari so'rovni o'zi to'ldiradi — material qatorlarisiz so'rovning
+# mazmuni bo'lmaydi.
+PURCHASE_ORDER_ROLES = {"admin", "procurement", "branch_manager"}
 CONTRACT_ROLES = {"admin", "procurement"}
 SUPPLIER_ROLES = {"admin", "procurement"}
 INVOICE_ROLES = {"admin", "accountant", "procurement"}
 PAYMENT_ROLES = {"admin", "accountant"}
 SITE_ROLES = {"admin", "branch_manager", "architecture"}
 DOCUMENT_MANAGE_ROLES = {"admin", "procurement", "branch_manager"}
-WORKFLOW_RULES = {
-    "created": {"submit": {"next_status": "architecture", "roles": {"prorab", "procurement", "admin"}}},
-    "architecture": {
-        "approve": {"next_status": "ceo", "roles": {"architecture", "admin"}},
-        "reject": {"next_status": "rejected", "roles": {"architecture", "admin"}},
-    },
-    "ceo": {
-        "approve": {"next_status": "approved", "roles": {"ceo", "admin"}},
-        "reject": {"next_status": "rejected", "roles": {"ceo", "admin"}},
-    },
-    "approved": {
-        "advance": {"next_status": "contract", "roles": {"procurement", "admin"}},
-        "reject": {"next_status": "rejected", "roles": {"procurement", "admin"}},
-    },
-    "contract": {
-        "advance": {"next_status": "payment", "roles": {"procurement", "accountant", "admin"}},
-        "reject": {"next_status": "rejected", "roles": {"procurement", "accountant", "admin"}},
-    },
-    "payment": {
-        "advance": {"next_status": "delivering", "roles": {"accountant", "admin"}},
-        "reject": {"next_status": "rejected", "roles": {"accountant", "admin"}},
-    },
-    "delivering": {"advance": {"next_status": "received", "roles": {"warehouse", "admin"}}},
-    "received": {"close": {"next_status": "closed", "roles": {"warehouse", "prorab", "admin"}}},
-    "rejected": {"reopen": {"next_status": "created", "roles": {"admin", "procurement", "prorab"}}},
-}
 
 
 def is_admin(user):
@@ -172,8 +154,12 @@ def branch_scope(queryset, user, field_name="branch"):
     butunlay o'chirar edi, ya'ni `/auth/register/` orqali ochilgan yangi
     hisob (filiali yo'q) barcha filiallarning hujjatlari, shartnomalari va
     to'lovlarini ko'ra olardi.
+
+    `GLOBAL_SCOPE_ROLES` — istisno: markaziy rollar (rais, xaridlar, nazorat)
+    barcha filiallarni ko'radi. Ular ko'pincha filialga biriktirilmaydi, va
+    bu istisnosiz filialsiz hisob sifatida hech nima ko'rmay qolardi.
     """
-    if is_admin(user):
+    if is_admin(user) or set(user.roles or []) & GLOBAL_SCOPE_ROLES:
         return queryset
     if not user.branch_id:
         return queryset.none()
@@ -269,10 +255,30 @@ def notify_users(users, title, message, notification_type="info"):
 
 
 def notify_branch_roles(branch, roles, title, message, notification_type="info"):
+    """
+    Filialdagi tegishli rollarga xabar yuboradi.
+
+    Markaziy rollar (rais, xaridlar, nazorat) ko'pincha filialga biriktirilmaydi
+    — ular filial bo'yicha filtrda umuman topilmasdi va zanjirdagi o'z
+    navbatlarini xabarsiz kutib qolardi. Shuning uchun ular filialdan qat'i
+    nazar qo'shiladi.
+    """
     if not branch:
         return
-    users = User.objects.filter(branch=branch, is_active=True)
-    filtered = [user for user in users if is_admin(user) or bool(set(user.roles or []).intersection(roles))]
+
+    wanted = set(roles)
+    # `roles` — JSONField, uni bazada ishonchli filtrlab bo'lmaydi (SQLite va
+    # PostgreSQL da sintaksis boshqacha), shuning uchun saralash Python'da.
+    # Ichki tizim, foydalanuvchilar soni kichik — bu qabul qilinadigan narx.
+    filtered = [
+        user
+        for user in User.objects.filter(is_active=True).only("id", "roles", "branch", "is_staff")
+        if is_admin(user)
+        or (
+            bool(set(user.roles or []) & wanted)
+            and (user.branch_id == branch.id or bool(set(user.roles or []) & GLOBAL_SCOPE_ROLES))
+        )
+    ]
     if filtered:
         notify_users(filtered, title, message, notification_type)
 
@@ -689,7 +695,9 @@ class DocumentListCreateView(generics.ListCreateAPIView):
         )
         notify_branch_roles(
             branch,
-            {"architecture", "branch_manager", "admin"},
+            # Xaridlar bo'limi so'rovni boshidanoq kuzatadi — arxitektura
+            # javobini kutmasdan filial rahbariga tuzatish aytishi uchun.
+            {"architecture", "procurement", "branch_manager", "admin"},
             "Yangi hujjat yaratildi",
             f"{document.doc_number} raqamli hujjat yaratildi va ko'rib chiqishni kutmoqda.",
             "info",
@@ -745,7 +753,16 @@ class DocumentWorkflowActionView(APIView):
         recipients = [document.created_by]
         notify_branch_roles(
             document.branch,
-            {"procurement", "accountant", "warehouse", "branch_manager", "admin"},
+            {
+                "architecture",
+                "ceo",
+                "procurement",
+                "anticorruption",
+                "accountant",
+                "warehouse",
+                "branch_manager",
+                "admin",
+            },
             "Hujjat holati yangilandi",
             f"{document.doc_number} hujjati {previous_status} dan {document.status} ga o'tdi.",
             "info" if document.status != "rejected" else "warning",

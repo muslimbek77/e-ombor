@@ -23,7 +23,16 @@ export interface UsersResponse {
   results: AppUser[];
 }
 
-export type UserRole = "admin" | "ceo" | "architecture" | "procurement" | "accountant" | "warehouse" | "prorab" | "branch_manager";
+export type UserRole =
+  | "admin"
+  | "ceo"
+  | "architecture"
+  | "procurement"
+  | "accountant"
+  | "warehouse"
+  | "prorab"
+  | "branch_manager"
+  | "anticorruption";
 
 export interface UserCreatePayload {
   email: string;

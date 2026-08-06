@@ -41,6 +41,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('warehouse', 'Omborchi'),
         ('prorab', 'Prorab (Foreman)'),
         ('branch_manager', 'Filial rahbari'),
+        ('anticorruption', 'Korrupsiyaga qarshi nazorat'),
     ]
     
     first_name = models.CharField(max_length=150, blank=True)
@@ -240,13 +241,15 @@ class Document(models.Model):
         ('invoice', 'Invoice'),
     ]
     
+    # Tasdiqlash zanjiri `api/workflow.py` da ta'riflangan — o'zgartirishda
+    # ikkalasi birga yangilanadi.
     STATUSES = [
         ('created', 'YARATILDI'),
         ('architecture', 'ARXITEKTURADA'),
         ('ceo', 'RAISDA'),
-        ('approved', 'TASDIQLANDI'),
-        ('contract', 'SHARTNOMADA'),
-        ('payment', 'TO\'LOVDA'),
+        ('procurement', 'XARIDLARDA'),
+        ('anticorruption', 'NAZORATDA'),
+        ('accountant', 'BUXGALTERIYADA'),
         ('delivering', 'YETKAZILMOQDA'),
         ('received', 'QABUL QILINDI'),
         ('closed', 'YOPILDI'),

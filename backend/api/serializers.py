@@ -26,34 +26,10 @@ from .models import (
     Warehouse,
 )
 
+from .workflow import allowed_actions_for
+
 User = get_user_model()
 ARCHIVE_VISIBLE_ROLES = {"admin", "procurement", "branch_manager"}
-SERIALIZER_WORKFLOW_RULES = {
-    "created": {"submit": {"roles": {"prorab", "procurement", "admin"}}},
-    "architecture": {
-        "approve": {"roles": {"architecture", "admin"}},
-        "reject": {"roles": {"architecture", "admin"}},
-    },
-    "ceo": {
-        "approve": {"roles": {"ceo", "admin"}},
-        "reject": {"roles": {"ceo", "admin"}},
-    },
-    "approved": {
-        "advance": {"roles": {"procurement", "admin"}},
-        "reject": {"roles": {"procurement", "admin"}},
-    },
-    "contract": {
-        "advance": {"roles": {"procurement", "accountant", "admin"}},
-        "reject": {"roles": {"procurement", "accountant", "admin"}},
-    },
-    "payment": {
-        "advance": {"roles": {"accountant", "admin"}},
-        "reject": {"roles": {"accountant", "admin"}},
-    },
-    "delivering": {"advance": {"roles": {"warehouse", "admin"}}},
-    "received": {"close": {"roles": {"warehouse", "prorab", "admin"}}},
-    "rejected": {"reopen": {"roles": {"admin", "procurement", "prorab"}}},
-}
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -226,13 +202,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             return []
 
         user = request.user
-        user_roles = set(user.roles or [])
-        actions = SERIALIZER_WORKFLOW_RULES.get(obj.status, {})
-        return [
-            action
-            for action, config in actions.items()
-            if user.is_staff or bool(user_roles.intersection(config["roles"]))
-        ]
+        return allowed_actions_for(obj.status, user.roles, is_staff=user.is_staff)
 
     def get_can_archive(self, obj):
         request = self.context.get("request")

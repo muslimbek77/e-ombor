@@ -11,9 +11,15 @@ import type { UserRole } from "../types/user";
 // ── Backenddagi rol to'plamlari (views.py: ADMIN_ROLES, ARCHIVE_ROLES, ...) ─────
 
 export const ADMIN_ROLES: UserRole[] = ["admin"];
+/**
+ * Tashkilot bo'ylab ko'radigan rollar. Bu faqat KO'RISH doirasi — yozish
+ * huquqi quyidagi to'plamlar bilan aniqlanadi va bunga bog'liq emas.
+ */
+export const GLOBAL_SCOPE_ROLES: UserRole[] = ["admin", "ceo", "procurement", "anticorruption"];
 export const ARCHIVE_ROLES: UserRole[] = ["admin", "procurement", "branch_manager"];
 export const STOCK_MOVEMENT_ROLES: UserRole[] = ["admin", "warehouse"];
-export const PURCHASE_ORDER_ROLES: UserRole[] = ["admin", "procurement"];
+/** Filial rahbari so'rovning material qatorlarini o'zi to'ldiradi. */
+export const PURCHASE_ORDER_ROLES: UserRole[] = ["admin", "procurement", "branch_manager"];
 export const CONTRACT_ROLES: UserRole[] = ["admin", "procurement"];
 export const SUPPLIER_ROLES: UserRole[] = ["admin", "procurement"];
 export const INVOICE_ROLES: UserRole[] = ["admin", "accountant", "procurement"];
@@ -38,18 +44,19 @@ export const REFERENCE_DATA_ROLES: UserRole[] = ["admin"];
  * to'plamlari bilan aniqlanadi va serverda ham xuddi shunday tekshiriladi.
  */
 export const PATH_ROLES: Record<string, UserRole[]> = {
-  "/purchases": ["ceo", "procurement", "accountant", "branch_manager"],
-  "/contracts": ["ceo", "procurement", "accountant", "branch_manager"],
-  "/suppliers": ["procurement", "accountant", "branch_manager"],
+  "/purchases": ["ceo", "procurement", "accountant", "branch_manager", "anticorruption"],
+  "/contracts": ["ceo", "procurement", "accountant", "branch_manager", "anticorruption"],
+  "/suppliers": ["procurement", "accountant", "branch_manager", "anticorruption"],
   "/addresses": ["procurement", "warehouse", "branch_manager"],
-  "/warehouse": ["warehouse", "prorab", "procurement", "branch_manager"],
-  "/inventory": ["warehouse", "prorab", "procurement", "branch_manager"],
+  "/warehouse": ["warehouse", "prorab", "procurement", "branch_manager", "anticorruption"],
+  "/inventory": ["warehouse", "prorab", "procurement", "branch_manager", "anticorruption"],
   "/materials": ["warehouse", "prorab", "procurement", "branch_manager"],
-  "/invoices": ["ceo", "accountant", "procurement", "branch_manager"],
+  "/invoices": ["ceo", "accountant", "procurement", "branch_manager", "anticorruption"],
   "/production-requests": ["prorab", "warehouse", "procurement", "branch_manager"],
-  "/reports": ["ceo", "architecture", "accountant", "branch_manager"],
+  "/reports": ["ceo", "architecture", "accountant", "branch_manager", "anticorruption"],
   "/users": [],
-  "/audit-logs": ["branch_manager"],
+  // Audit log — nazorat rolining asosiy ish quroli.
+  "/audit-logs": ["branch_manager", "anticorruption"],
 };
 
 // ── Tekshiruvchilar ────────────────────────────────────────────────────────────

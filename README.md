@@ -4,7 +4,7 @@
 ![DRF](https://img.shields.io/badge/DRF-3.15-A30000)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/testlar-75%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/testlar-84%20passing-2ea44f)
 
 Qurilish tashkilotlari uchun ombor, hujjat aylanishi va moliya boshqaruvi
 platformasi. Filiallar, qurilish obyektlari va omborlar bo'yicha
@@ -18,7 +18,7 @@ bitta zanjirda kuzatiladi.
 | Backend | Django 4.2 + DRF, JWT autentifikatsiya, 50 endpoint, 21 model |
 | Frontend | React 19 + TypeScript + Vite, TanStack Query, Tailwind v4 |
 | Baza | SQLite (dev) / PostgreSQL (prod) |
-| Testlar | 75 ta (`python manage.py test api`) |
+| Testlar | 84 ta (`python manage.py test api`) |
 
 > **Tizim mantiqi to'liq bayon qilingan:** [`docs/TIZIM.md`](docs/TIZIM.md) —
 > rol matritsasi, filial izolyatsiyasi qoidasi, hujjat oqimi, ombor va moliya
@@ -57,7 +57,8 @@ bo'lishi mumkin.
 | `accountant` | Buxgalter |
 | `warehouse` | Omborchi |
 | `prorab` | Prorab — obyektdan zayavka beradi |
-| `branch_manager` | Filial rahbari |
+| `branch_manager` | Filial rahbari — xarid so'rovini boshlaydi |
+| `anticorruption` | Korrupsiyaga qarshi nazorat — to'lovdan oldingi tekshiruv, hech nima yoza olmaydi |
 
 **O'zgartirish huquqi** (o'qish barcha rollarga ochiq, filial doirasida):
 
@@ -66,7 +67,8 @@ bo'lishi mumkin.
 | Filial, material, ombor, manzil | `admin` |
 | Yetkazib beruvchi | `admin`, `procurement` |
 | Qurilish obyekti | `admin`, `branch_manager`, `architecture` |
-| Xarid buyurtmasi, shartnoma | `admin`, `procurement` |
+| Xarid buyurtmasi | `admin`, `procurement`, `branch_manager` |
+| Shartnoma | `admin`, `procurement` |
 | Hisob-faktura | `admin`, `accountant`, `procurement` |
 | To'lov | `admin`, `accountant` |
 | Ombor harakati va zaxira | `admin`, `warehouse` |
@@ -78,8 +80,12 @@ bo'lishi mumkin.
 | Foydalanuvchi | Ko'radigan ma'lumot |
 |---|---|
 | Admin | Hammasi |
+| Markaziy rol (`ceo`, `procurement`, `anticorruption`) | Hammasi — qaror uchun butun manzara kerak |
 | Filiali bor xodim | Faqat o'z filiali |
 | Filiali yo'q hisob | Hech nima |
+
+Markaziy rollar uchun bu **faqat ko'rish** doirasi — yozish huquqi yuqoridagi
+jadval bilan alohida tekshiriladi.
 
 Chegaralash ro'yxat va tafsilot endpointlarida bir xil ishlaydi — id ni
 taxmin qilib begona filial yozuviga kirib bo'lmaydi.
@@ -93,14 +99,17 @@ taxmin qilib begona filial yozuviga kirib bo'lmaydi.
 ```mermaid
 stateDiagram-v2
     [*] --> created
-    created --> architecture: submit (prorab, procurement)
+    created --> architecture: submit (filial rahbari, prorab, xaridlar)
     architecture --> ceo: approve (architecture)
     architecture --> rejected: reject
-    ceo --> approved: approve (ceo)
+    ceo --> procurement: approve (ceo)
     ceo --> rejected: reject
-    approved --> contract: advance (procurement)
-    contract --> payment: advance (procurement, accountant)
-    payment --> delivering: advance (accountant)
+    procurement --> anticorruption: approve (procurement)
+    procurement --> rejected: reject
+    anticorruption --> accountant: approve (anticorruption)
+    anticorruption --> rejected: reject
+    accountant --> delivering: approve (accountant)
+    accountant --> rejected: reject
     delivering --> received: advance (warehouse)
     received --> closed: close (warehouse, prorab)
     rejected --> created: reopen (procurement, prorab)
@@ -200,6 +209,7 @@ Demo loginlar:
 | `warehouse@eombor.uz` | `Warehouse123!` | warehouse |
 | `prorab@eombor.uz` | `Prorab123!` | prorab |
 | `branch@eombor.uz` | `Branch123!` | branch_manager |
+| `control@eombor.uz` | `Control123!` | anticorruption |
 | `site.engineer@eombor.uz` | `Engineer123!` | architecture + procurement |
 
 ---
@@ -214,7 +224,7 @@ To'liq va har doim dolzarb hujjat — **Swagger:** `/api/docs/`
 | Auth | `/api/auth/` — `register`, `login`, `refresh`, `logout`, `user`, `change-password` | — |
 | Foydalanuvchilar | `/api/users/` | `admin` |
 | Hujjatlar | `/api/documents/` + `{id}/workflow/`, `{id}/archive/`, `{id}/files/`, `export/` | muallif, `admin`, `procurement`, `branch_manager` |
-| Xarid | `/api/purchase-orders/` | `admin`, `procurement` |
+| Xarid | `/api/purchase-orders/` | `admin`, `procurement`, `branch_manager` |
 | Ma'lumotnoma | `/api/materials/`, `/api/warehouses/`, `/api/branches/`, `/api/addresses/` | `admin` |
 | Yetkazib beruvchilar | `/api/suppliers/` | `admin`, `procurement` |
 | Obyektlar | `/api/sites/` | `admin`, `branch_manager`, `architecture` |
@@ -241,7 +251,7 @@ python manage.py test api
 | Fayl | Qamrov |
 |---|---|
 | `api/tests_stock_movements.py` | Ombor harakatlari, satr qulflash, yetarsiz qoldiq (30 test) |
-| `api/tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (45 test) |
+| `api/tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, tasdiqlash zanjiri, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (54 test) |
 
 `tests_api_contract.py` da har bir tekshiruv **kutilgan** xulqni tasdiqlaydi.
 Yiqilgan test — tuzatilishi kerak bo'lgan xato, testni moslashtirish emas.
@@ -256,6 +266,7 @@ Frontendda test runner sozlanmagan.
 e-ombor/
 ├── backend/
 │   ├── api/
+│   │   ├── workflow.py                  # tasdiqlash zanjiri — yagona manba
 │   │   ├── models.py                    # 21 model
 │   │   ├── serializers.py
 │   │   ├── views.py                     # 50 endpoint, rol darvozalari
@@ -313,7 +324,7 @@ e-ombor/
 ## Bajarilgan va rejadagi ishlar
 
 - [x] Rol asosidagi dashboard va navigatsiya
-- [x] Hujjat aylanishi — 10 holatli tasdiqlash zanjiri
+- [x] Hujjat aylanishi — filial rahbaridan omborgacha 10 holatli tasdiqlash zanjiri
 - [x] Ombor moduli — kirim/chiqim/ko'chirish, qoldiq nazorati, kam zaxira ogohlantirishi
 - [x] Obyekt va filial kuzatuvi
 - [x] Moliya — shartnoma, hisob-faktura, to'lov zanjiri

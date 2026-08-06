@@ -214,6 +214,18 @@ class Command(BaseCommand):
                 "roles": ["architecture", "procurement"],
                 "branch": branch_third,
             },
+            {
+                # Nazorat roli filialsiz — u butun tizimni ko'radi
+                # (views.py: GLOBAL_SCOPE_ROLES).
+                "email": "control@eombor.uz",
+                "password": "Control123!",
+                "first_name": "Bekzod",
+                "last_name": "Ismoilov",
+                "phone": "+998901111120",
+                "stir_inn": "123456789021",
+                "roles": ["anticorruption"],
+                "branch": None,
+            },
         ]
         self.demo_passwords = {}
         users = []
@@ -514,7 +526,7 @@ class Command(BaseCommand):
             {
                 "doc_number": "CT-20260709-0001",
                 "doc_type": "contract",
-                "status": "contract",
+                "status": "accountant",
                 "title": "UzBuild Trade shartnomasi",
                 "description": "Sement yetkazib berish bo'yicha shartnoma.",
                 "created_by": procurement,
@@ -526,7 +538,7 @@ class Command(BaseCommand):
             {
                 "doc_number": "IV-20260709-0001",
                 "doc_type": "invoice",
-                "status": "payment",
+                "status": "accountant",
                 "title": "1-oy hisob-faktura",
                 "description": "Sement va armatura uchun invoice.",
                 "created_by": accountant,
@@ -550,7 +562,7 @@ class Command(BaseCommand):
             {
                 "doc_number": "PR-20260709-0004",
                 "doc_type": "purchase_request",
-                "status": "approved",
+                "status": "procurement",
                 "title": "Ombor to'ldirish so'rovi",
                 "description": "Markaziy ombor uchun qo'shimcha materiallar.",
                 "created_by": warehouse_user,
@@ -610,7 +622,7 @@ class Command(BaseCommand):
             {
                 "doc_number": "CT-20260709-0003",
                 "doc_type": "contract",
-                "status": "contract",
+                "status": "accountant",
                 "title": "Farg'ona Build Market shartnomasi",
                 "description": "Ichki pardoz materiallari bo'yicha shartnoma.",
                 "created_by": procurement,
@@ -622,7 +634,7 @@ class Command(BaseCommand):
             {
                 "doc_number": "IV-20260709-0004",
                 "doc_type": "invoice",
-                "status": "payment",
+                "status": "accountant",
                 "title": "Qo'shimcha to'lov invoice",
                 "description": "Plitka va bo'yoq uchun invoice.",
                 "created_by": accountant,
@@ -961,7 +973,7 @@ class Command(BaseCommand):
                 "request_number": "PRD-20260709-002",
                 "title": "Oynalar uchun profil",
                 "description": "Fasad ishlari uchun profil va kabel kerak.",
-                "status": "approved",
+                "status": "procurement",
                 "created_by": prorab,
             },
             {
@@ -977,7 +989,7 @@ class Command(BaseCommand):
                 "request_number": "PRD-20260709-004",
                 "title": "Farg'ona ombori uchun qoplama",
                 "description": "Yangi ombor qoplama materiallari kerak.",
-                "status": "approved",
+                "status": "procurement",
                 "created_by": site_engineer,
             },
             {

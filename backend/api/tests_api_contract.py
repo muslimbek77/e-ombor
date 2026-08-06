@@ -48,6 +48,7 @@ ROLE_KEYS = [
     "warehouse",
     "prorab",
     "branch_manager",
+    "anticorruption",
 ]
 
 
@@ -511,6 +512,39 @@ class BranchIsolationTests(BaseAPITestCase):
         response = self.client.get(reverse("warehouse-detail", args=[self.warehouse_b.id]))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_global_roles_see_every_branch(self):
+        """
+        Rais, xaridlar va nazorat markaziy rollar — ular qaror qabul qilish
+        uchun barcha filiallarni ko'rishi kerak.
+        """
+        for role in ("ceo", "procurement", "anticorruption"):
+            with self.subTest(role=role):
+                self.auth(self.users[role])  # A filialiga biriktirilgan
+                response = self.client.get(reverse("document-detail", args=[self.document_b.id]))
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_procurement_sees_stock_of_every_branch(self):
+        """Xaridlar bo'limi qaror qabul qilishda butun ombor holatiga tayanadi."""
+        self.auth(self.users["procurement"])
+        response = self.client.get(reverse("warehouse-detail", args=[self.warehouse_b.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_global_read_scope_does_not_grant_write(self):
+        """Kengaytirilgan ko'rish doirasi yozish huquqini bermaydi."""
+        self.auth(self.users["anticorruption"])
+        response = self.client.delete(reverse("warehouse-detail", args=[self.warehouse_b.id]))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Warehouse.objects.filter(id=self.warehouse_b.id).exists())
+
+    def test_branch_bound_roles_still_isolated(self):
+        """Global bo'lmagan rollar uchun izolyatsiya o'zgarmagan."""
+        for role in ("warehouse", "accountant", "branch_manager", "architecture"):
+            with self.subTest(role=role):
+                self.auth(self.users[role])
+                response = self.client.get(reverse("document-detail", args=[self.document_b.id]))
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_warehouse_of_another_branch_cannot_be_deleted(self):
         self.auth(self.users["warehouse"])
         response = self.client.delete(reverse("warehouse-detail", args=[self.warehouse_b.id]))
@@ -527,12 +561,15 @@ class BranchIsolationTests(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_document_detail_hides_other_branches(self):
-        self.auth(self.users["procurement"])  # A filiali
+        # Buxgalter — filialga bog'langan rol. `procurement` bu yerda ishlatilmaydi:
+        # u markaziy rol bo'lgani uchun barcha filiallarni ataylab ko'radi
+        # (test_global_roles_see_every_branch).
+        self.auth(self.users["accountant"])  # A filiali
         response = self.client.get(reverse("document-detail", args=[self.document_b.id]))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_file_upload_to_another_branch_document_is_blocked(self):
-        self.auth(self.users["procurement"])  # A filiali
+        self.auth(self.users["accountant"])  # A filiali
         response = self.client.get(
             reverse("document-file-list", args=[self.document_b.id])
         )
@@ -580,12 +617,12 @@ class DocumentWorkflowTests(BaseAPITestCase):
         url = reverse("document-workflow", args=[document.id])
 
         chain = [
-            ("prorab", "submit", "architecture"),
+            ("branch_manager", "submit", "architecture"),
             ("architecture", "approve", "ceo"),
-            ("ceo", "approve", "approved"),
-            ("procurement", "advance", "contract"),
-            ("accountant", "advance", "payment"),
-            ("accountant", "advance", "delivering"),
+            ("ceo", "approve", "procurement"),
+            ("procurement", "approve", "anticorruption"),
+            ("anticorruption", "approve", "accountant"),
+            ("accountant", "approve", "delivering"),
             ("warehouse", "advance", "received"),
             ("warehouse", "close", "closed"),
         ]
@@ -597,6 +634,91 @@ class DocumentWorkflowTests(BaseAPITestCase):
 
                 self.assertEqual(response.status_code, status.HTTP_200_OK)
                 self.assertEqual(response.data["status"], expected_status)
+
+    def test_each_stage_rejects_the_wrong_role(self):
+        """Zanjirning har bosqichida faqat mas'ul rol o'ta oladi."""
+        # (bosqich, o'sha bosqichga tegishli BO'LMAGAN rol)
+        cases = [
+            ("architecture", "accountant"),
+            ("ceo", "procurement"),
+            ("procurement", "accountant"),
+            ("anticorruption", "procurement"),
+            ("accountant", "anticorruption"),
+        ]
+
+        for index, (stage, wrong_role) in enumerate(cases):
+            with self.subTest(stage=stage, role=wrong_role):
+                document = self._create_document(f"XR-2026-02{index:02d}")
+                document.status = stage
+                document.save(update_fields=["status"])
+
+                self.auth(self.users[wrong_role])
+                response = self.client.post(
+                    reverse("document-workflow", args=[document.id]),
+                    {"action": "approve"},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_anticorruption_stage_cannot_be_skipped(self):
+        """Xaridlardan keyin hujjat to'g'ridan-to'g'ri buxgalteriyaga o'tmaydi."""
+        document = self._create_document("XR-2026-0210")
+        document.status = "procurement"
+        document.save(update_fields=["status"])
+
+        self.auth(self.users["procurement"])
+        response = self.client.post(
+            reverse("document-workflow", args=[document.id]), {"action": "approve"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "anticorruption")
+
+    def test_anticorruption_can_reject_before_payment(self):
+        document = self._create_document("XR-2026-0211")
+        document.status = "anticorruption"
+        document.save(update_fields=["status"])
+
+        self.auth(self.users["anticorruption"])
+        response = self.client.post(
+            reverse("document-workflow", args=[document.id]),
+            {"action": "reject", "comment": "Ombor qoldig'i yetarli."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "rejected")
+
+    def test_branch_manager_can_submit_own_request(self):
+        """Yangi oqim filial rahbaridan boshlanadi — u so'rovni o'zi jo'natadi."""
+        document = self._create_document("XR-2026-0212")
+
+        self.auth(self.users["branch_manager"])
+        response = self.client.post(
+            reverse("document-workflow", args=[document.id]), {"action": "submit"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "architecture")
+
+    def test_allowed_actions_match_the_server_rules(self):
+        """
+        `allowed_actions` va haqiqiy tekshiruv bitta manbadan o'qiladi.
+        Ular ajralib qolsa foydalanuvchiga bosilganda 403 beradigan tugma
+        ko'rinadi — shuning uchun ikkalasi solishtiriladi.
+        """
+        document = self._create_document("XR-2026-0213")
+        document.status = "anticorruption"
+        document.save(update_fields=["status"])
+        url = reverse("document-detail", args=[document.id])
+
+        self.auth(self.users["anticorruption"])
+        self.assertEqual(
+            sorted(self.client.get(url).data["allowed_actions"]), ["approve", "reject"]
+        )
+
+        self.auth(self.users["accountant"])
+        self.assertEqual(self.client.get(url).data["allowed_actions"], [])
 
     def test_wrong_role_cannot_advance_the_document(self):
         document = self._create_document("XR-2026-0101")

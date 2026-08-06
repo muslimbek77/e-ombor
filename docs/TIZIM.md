@@ -4,7 +4,7 @@ Bu hujjat platformaning ishlash mantiqini bir joyda bayon qiladi: kim nima
 qila oladi, hujjat qanday yo'ldan o'tadi, ma'lumot qanday chegaralanadi va
 nima tekshirilgan. Har bir da'vo `backend/api/tests_api_contract.py` va
 `backend/api/tests_stock_movements.py` dagi testlar bilan qo'llab-quvvatlangan
-(jami 75 ta test).
+(jami 84 ta test).
 
 ---
 
@@ -98,7 +98,8 @@ bo'lishi mumkin.
 | `accountant` | Buxgalter |
 | `warehouse` | Omborchi |
 | `prorab` | Prorab — obyektdan zayavka beradi |
-| `branch_manager` | Filial rahbari |
+| `branch_manager` | Filial rahbari — xarid so'rovini boshlaydi |
+| `anticorruption` | Korrupsiyaga qarshi nazorat — to'lovdan oldingi tekshiruv |
 
 ### `is_staff` — admin bo'lishning ikkinchi yo'li
 
@@ -137,7 +138,7 @@ bo'lib `True` qaytaradi, ya'ni admin hamma katakda ✅.
 | Filial, material, ombor, manzil | — | — | — | — | — | — | — |
 | Yetkazib beruvchi | — | — | ✅ | — | — | — | — |
 | Qurilish obyekti | — | ✅ | — | — | — | — | ✅ |
-| Xarid buyurtmasi | — | — | ✅ | — | — | — | — |
+| Xarid buyurtmasi | — | — | ✅ | — | — | — | ✅ |
 | Shartnoma | — | — | ✅ | — | — | — | — |
 | Hisob-faktura | — | — | ✅ | ✅ | — | — | — |
 | To'lov | — | — | — | ✅ | — | — | — |
@@ -150,6 +151,17 @@ bo'lib `True` qaytaradi, ya'ni admin hamma katakda ✅.
 | Foydalanuvchilar | — | — | — | — | — | — | — |
 
 *"muallif" — faqat o'zi yaratgan hujjatni; begonasini emas.*
+
+**`anticorruption` ustuni jadvalda yo'q, chunki uning hamma katagi bo'sh.**
+Nazorat roli tizimda hech nimani o'zgartirmaydi — u faqat o'qiydi va o'z
+bosqichida qaror qabul qiladi. Bu ataylab: yozish huquqi berilgan kuzatuvchi
+o'zi ham jarayon qatnashchisiga aylanadi va nazorat qiymatini yo'qotadi.
+Hozircha bu "hech bir yozish to'plamiga kiritilmagan" degani, ya'ni himoya
+passiv — hujjat/zayavka/murojaat yaratish esa hamma rolga ochiqligicha
+qolmoqda. Aktiv taqiq keyingi bosqichda qo'shiladi.
+
+**Xarid buyurtmasi** endi filial rahbariga ham ochiq: yangi oqimda so'rovni
+u boshlaydi, va material qatorlarisiz so'rovning mazmuni bo'lmaydi.
 
 Uch qator izoh talab qiladi. **Hujjat yaratish** ochiq: oqim shu bilan
 boshlanadi va uni kim boshlashi keyingi bosqichdagi rol tekshiruvi bilan
@@ -177,8 +189,16 @@ ajratadi:
 | Foydalanuvchi | Ko'radigan ma'lumot |
 |---|---|
 | Admin (`admin` roli yoki `is_staff`) | Hammasi |
+| Markaziy rol — `ceo`, `procurement`, `anticorruption` | Hammasi |
 | Filiali bor xodim | Faqat o'z filiali |
 | Filiali yo'q hisob | Hech nima (bo'sh ro'yxat) |
+
+Markaziy rollar (`views.py: GLOBAL_SCOPE_ROLES`) tashkilot bo'ylab qaror qabul
+qiladi: rais barcha filial hujjatlarini tasdiqlaydi, xaridlar bo'limi qaror
+qabul qilishda butun ombor holatiga tayanadi, nazorat esa tizimni to'liq
+ko'rmasa vazifasini bajara olmaydi. Bu **faqat ko'rish** doirasi — yozish
+huquqi 4-bo'limdagi to'plamlar bilan alohida tekshiriladi, va uni bu istisno
+kengaytirmaydi.
 
 Uchinchi qator muhim: yangi ro'yxatdan o'tgan hisobda filial yo'q, va u
 hech qanday ish ma'lumotini ko'rmaydi. Admin unga filial va rol bergandan
@@ -197,22 +217,34 @@ murojaatlarini, filialsiz esa faqat o'zi yaratganini ko'radi.
 ## 6. Hujjat oqimi
 
 `Document` — o'nta holatli avtomat. Har bir o'tish uchun aniq rol talab
-qilinadi (`views.py: WORKFLOW_RULES`).
+qilinadi. Qoidalar **faqat `api/workflow.py`** da ta'riflangan: haqiqiy
+tekshiruv (`views.py`) va frontendga qaytadigan `allowed_actions`
+(`serializers.py`) ikkalasi ham shu fayldan o'qiydi. Ilgari bu ikki nusxada
+edi va ajralib qolsa foydalanuvchiga bosilganda 403 beradigan tugma
+ko'rinardi.
+
+Bosqichlar ikki turga bo'linadi: **tasdiqlash** bosqichlari (`approve` /
+`reject` — mas'ul rol qaror qabul qiladi) va **bajarish** bosqichlari
+(`advance` / `close` — qaror emas, faktni qayd etish).
+
+Zanjirdagi to'rtta tasdiq — arxitektura, rais, xaridlar, nazorat — ketma-ket
+va chetlab o'tib bo'lmaydi. Nazorat (`anticorruption`) ataylab **buxgalteriyadan
+oldin** turadi: to'lov ketgandan keyin tekshirishning ma'nosi yo'q.
 
 ```mermaid
 stateDiagram-v2
     [*] --> created: hujjat yaratildi
-    created --> architecture: submit (prorab, procurement)
+    created --> architecture: submit (filial rahbari, prorab, xaridlar)
     architecture --> ceo: approve (architecture)
     architecture --> rejected: reject (architecture)
-    ceo --> approved: approve (ceo)
+    ceo --> procurement: approve (ceo)
     ceo --> rejected: reject (ceo)
-    approved --> contract: advance (procurement)
-    approved --> rejected: reject (procurement)
-    contract --> payment: advance (procurement, accountant)
-    contract --> rejected: reject (procurement, accountant)
-    payment --> delivering: advance (accountant)
-    payment --> rejected: reject (accountant)
+    procurement --> anticorruption: approve (procurement)
+    procurement --> rejected: reject (procurement)
+    anticorruption --> accountant: approve (anticorruption)
+    anticorruption --> rejected: reject (anticorruption)
+    accountant --> delivering: approve (accountant)
+    accountant --> rejected: reject (accountant)
     delivering --> received: advance (warehouse)
     received --> closed: close (warehouse, prorab)
     rejected --> created: reopen (procurement, prorab)
@@ -224,20 +256,20 @@ to'g'ridan-to'g'ri aksi:
 
 | Joriy holat | Amal | Keyingi holat | Kim bajaradi |
 |---|---|---|---|
-| `created` | `submit` | `architecture` | prorab, xaridlar |
+| `created` | `submit` | `architecture` | filial rahbari, prorab, xaridlar |
 | `architecture` | `approve` | `ceo` | arxitektura |
 | `architecture` | `reject` | `rejected` | arxitektura |
-| `ceo` | `approve` | `approved` | ceo |
+| `ceo` | `approve` | `procurement` | ceo |
 | `ceo` | `reject` | `rejected` | ceo |
-| `approved` | `advance` | `contract` | xaridlar |
-| `approved` | `reject` | `rejected` | xaridlar |
-| `contract` | `advance` | `payment` | xaridlar, buxgalter |
-| `contract` | `reject` | `rejected` | xaridlar, buxgalter |
-| `payment` | `advance` | `delivering` | buxgalter |
-| `payment` | `reject` | `rejected` | buxgalter |
+| `procurement` | `approve` | `anticorruption` | xaridlar |
+| `procurement` | `reject` | `rejected` | xaridlar |
+| `anticorruption` | `approve` | `accountant` | nazorat |
+| `anticorruption` | `reject` | `rejected` | nazorat |
+| `accountant` | `approve` | `delivering` | buxgalter |
+| `accountant` | `reject` | `rejected` | buxgalter |
 | `delivering` | `advance` | `received` | omborchi |
 | `received` | `close` | `closed` | omborchi, prorab |
-| `rejected` | `reopen` | `created` | xaridlar, prorab |
+| `rejected` | `reopen` | `created` | filial rahbari, prorab, xaridlar |
 
 `admin` har qanday o'tishni bajara oladi — jadvalda alohida ko'rsatilmagan.
 
@@ -359,7 +391,7 @@ python manage.py test api
 | Fayl | Qamrov |
 |---|---|
 | `tests_stock_movements.py` | Ombor harakatlari, qulflash, yetarsiz qoldiq (30 test) |
-| `tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (45 test) |
+| `tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, tasdiqlash zanjiri, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (54 test) |
 
 `tests_api_contract.py` da har bir tekshiruv **kutilgan** xulqni tasdiqlaydi.
 Yiqilgan test — tuzatilishi kerak bo'lgan xato, testni moslashtirish emas.
@@ -380,7 +412,23 @@ Quyidagilar hozircha bajarilmagan va keyingi bosqichga qoladi:
    kerak.
 
 3. **Hujjat oqimi orqaga qaytmaydi.** `rejected` dan `created` ga qaytish
-   bor, lekin oraliq holatdan bir qadam orqaga qaytish yo'q.
+   bor, lekin oraliq holatdan bir qadam orqaga qaytish yo'q. Olti bosqichli
+   zanjirda bu sezilarli: oxirgi bosqichdagi mayda xato ham so'rovni butunlay
+   boshiga qaytaradi.
+
+6. **Hujjat istalgan holatda tahrirlanadi.** `_ensure_can_manage` holatni
+   tekshirmaydi — tasdiqlangan, hatto yopilgan hujjatning summasi ham
+   o'zgartirilishi mumkin. Tasdiqlash zanjirining qiymati shu bilan
+   cheklanadi; muzlatish keyingi bosqichda.
+
+7. **Hujjatga bog'langan izoh yo'q.** Xaridlar bo'limi so'rovni birinchi
+   bosqichdan ko'radi va filial rahbariga tuzatish aytishi kerak, lekin bu
+   suhbat uchun tizimda joy yo'q — `DocumentApproval.comment` faqat holat
+   o'zgarganda yoziladi.
+
+8. **Qabul ombor qoldig'ini o'zgartirmaydi.** `delivering → received` faqat
+   statusni almashtiradi, `StockMovement` yaratmaydi. Ya'ni xaridlar bo'limi
+   qaror qabul qilishda ko'radigan qoldiq zanjir yakunini aks ettirmaydi.
 
 4. **Frontendda test yo'q.** Rol darvozalari faqat backendda avtomatik
    tekshiriladi; frontend nusxasi qo'lda moslashtiriladi.
