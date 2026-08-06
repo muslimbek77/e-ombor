@@ -31,7 +31,7 @@ bitta zanjirda kuzatiladi.
 ```mermaid
 flowchart TD
     B["Brauzer"] -->|HTTPS| F["React + TypeScript<br/>frontend/"]
-    F -->|"REST, JWT Bearer"| V["views.py — 50 endpoint<br/>rol va filial tekshiruvi"]
+    F -->|"REST, JWT Bearer"| V["views/ — 51 endpoint<br/>rol va filial tekshiruvi"]
     V --> S["serializers.py"]
     S --> MO["models.py — 21 model<br/>Django ORM"]
     MO --> D[("SQLite / PostgreSQL")]
@@ -265,9 +265,9 @@ python manage.py test api
 | Fayl | Qamrov |
 |---|---|
 | `api/tests_stock_movements.py` | Ombor harakatlari, satr qulflash, yetarsiz qoldiq (30 test) |
-| `api/tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, nazorat rolining yozish taqiqi va SoD, tasdiqlash zanjiri, hujjat muzlatilishi, izohlar, tuzatishga qaytarish, qabul, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (113 test) |
+| `api/tests_*.py` (9 ta fayl) | Auth oqimi, bo'sh baza, rol matritsasi, nazorat rolining yozish taqiqi va SoD, tasdiqlash zanjiri, hujjat muzlatilishi, izohlar, tuzatishga qaytarish, qabul, filial izolyatsiyasi, raqam generatsiyasi, filtrlar (113 test) |
 
-`tests_api_contract.py` da har bir tekshiruv **kutilgan** xulqni tasdiqlaydi.
+Har bir tekshiruv **kutilgan** xulqni tasdiqlaydi.
 Yiqilgan test — tuzatilishi kerak bo'lgan xato, testni moslashtirish emas.
 
 Frontendda test runner sozlanmagan.
@@ -283,7 +283,8 @@ e-ombor/
 │   │   ├── workflow.py                  # tasdiqlash zanjiri — yagona manba
 │   │   ├── models.py                    # 21 model
 │   │   ├── serializers.py
-│   │   ├── views.py                     # 50 endpoint, rol darvozalari
+│   │   ├── views/                      # 51 endpoint, domen bo'yicha
+│   │   ├── roles.py  scope.py          # kim kim / kim nimani ko'radi
 │   │   ├── urls.py
 │   │   ├── admin.py
 │   │   ├── migrations/
@@ -291,7 +292,7 @@ e-ombor/
 │   │   │   ├── seed_demo_data.py        # demo to'plam
 │   │   │   └── flush_demo_data.py       # tozalash (user/rol/filial qoladi)
 │   │   ├── tests_stock_movements.py
-│   │   └── tests_api_contract.py
+│   │   └── tests_*.py                  # 9 ta test fayli
 │   ├── e_ombor_backend/                 # settings, urls, wsgi/asgi
 │   ├── manage.py
 │   └── requirements.txt

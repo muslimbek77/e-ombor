@@ -1,5 +1,8 @@
 """
-Global ruxsat sinflari.
+Ruxsat sinflari — kim nimani YOZA oladi.
+
+Ko'rish doirasi bu yerda emas: u `scope.py` da. Rol to'plamlarining o'zi
+`roles.py` da.
 
 Bu yerdagi `ControlRoleReadOnly` `settings.REST_FRAMEWORK` dagi
 `DEFAULT_PERMISSION_CLASSES` orqali barcha view'ga qo'llanadi. Uni har bir
@@ -10,6 +13,14 @@ kim shikoyat qilmaydi, chunki taqiq ishlamayotgani sezilmaydi.
 
 from rest_framework import permissions
 
+from .roles import (
+    ADMIN_ROLES,
+    INVOICE_ROLES,
+    PAYMENT_ROLES,
+    SITE_ROLES,
+    SUPPLIER_ROLES,
+    has_any_role,
+)
 from .workflow import CONTROL_ROLE
 
 
@@ -50,3 +61,54 @@ class ControlRoleReadOnly(permissions.BasePermission):
         if not is_control_user(request.user):
             return True
         return bool(getattr(view, "control_role_may_write", False))
+
+
+# Qo'shimcha ruxsat sinfi kerak bo'lgan view'lar uchun. DRF'da `permission_classes`
+# e'lon qilinsa `DEFAULT_PERMISSION_CLASSES` butunlay almashadi — nazorat rolining
+# yozish taqiqi ham shu bilan tushib qolardi. Shuning uchun qo'shimcha sinf shu
+# to'plamning USTIGA qo'shiladi, o'rniga emas.
+DEFAULT_PERMISSIONS = (permissions.IsAuthenticated, ControlRoleReadOnly)
+
+
+class RoleGatedWrite(permissions.BasePermission):
+    """
+    O'qish hammaga (autentifikatsiyadan o'tganlarga), yozish esa faqat
+    `write_roles` dagi rollarga ochiq.
+
+    Ma'lumotnoma bazasi — filial, material, ombor, obyekt, yetkazib beruvchi —
+    ilgari hech qanday rol tekshiruvisiz edi: istalgan xodim material qo'sha,
+    ombor tahrirlay yoki filialni butunlay o'chira olardi (filial o'chsa unga
+    bog'langan foydalanuvchilar filialsiz qolardi).
+    """
+
+    write_roles = ADMIN_ROLES
+    message = "Bu bo'limni o'zgartirish uchun sizda ruxsat yo'q"
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return has_any_role(request.user, self.write_roles)
+
+
+class AdminOnlyWrite(RoleGatedWrite):
+    write_roles = ADMIN_ROLES
+
+
+class SupplierWrite(RoleGatedWrite):
+    write_roles = SUPPLIER_ROLES
+    message = "Yetkazib beruvchini o'zgartirish uchun sizda ruxsat yo'q"
+
+
+class SiteWrite(RoleGatedWrite):
+    write_roles = SITE_ROLES
+    message = "Qurilish obyektini o'zgartirish uchun sizda ruxsat yo'q"
+
+
+class InvoiceWrite(RoleGatedWrite):
+    write_roles = INVOICE_ROLES
+    message = "Hisob-fakturani o'zgartirish uchun sizda ruxsat yo'q"
+
+
+class PaymentWrite(RoleGatedWrite):
+    write_roles = PAYMENT_ROLES
+    message = "To'lov qayd etish uchun sizda ruxsat yo'q"

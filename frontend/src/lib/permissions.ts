@@ -2,13 +2,13 @@ import { useAuthStore } from "../stores/authStore";
 import type { UserRole } from "../types/user";
 
 /**
- * Frontend rol tekshiruvi — backenddagi `api/views.py` qoidalarining nusxasi.
+ * Frontend rol tekshiruvi — backenddagi `api/roles.py` qoidalarining nusxasi.
  * Bu yerdagi hech narsa xavfsizlik chorasi emas: server baribir har bir so'rovni
  * qaytadan tekshiradi. Maqsad — foydalanuvchiga bosgandan keyin 403 olmaydigan
  * tugmalarni va kira olmaydigan bo'limlarni umuman ko'rsatmaslik.
  */
 
-// ── Backenddagi rol to'plamlari (views.py: ADMIN_ROLES, ARCHIVE_ROLES, ...) ─────
+// ── Backenddagi rol to'plamlari (roles.py: ADMIN_ROLES, ARCHIVE_ROLES, ...) ────
 
 export const ADMIN_ROLES: UserRole[] = ["admin"];
 /**
@@ -45,7 +45,7 @@ export const CONTROL_ROLE: UserRole = "anticorruption";
 
 /**
  * Ma'lumotnoma bazasi — filial, material, ombor, manzil. Ko'rish hammaga
- * ochiq, o'zgartirish faqat adminga (views.py: AdminOnlyWrite).
+ * ochiq, o'zgartirish faqat adminga (permissions.py: AdminOnlyWrite).
  */
 export const REFERENCE_DATA_ROLES: UserRole[] = ["admin"];
 

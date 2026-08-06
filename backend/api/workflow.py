@@ -1,7 +1,7 @@
 """
 Hujjat tasdiqlash zanjiri — yagona manba.
 
-Bu qoidalar ilgari ikki joyda takrorlangan edi: `views.py` (haqiqiy tekshiruv)
+Bu qoidalar ilgari ikki joyda takrorlangan edi: `views/` (haqiqiy tekshiruv)
 va `serializers.py` (frontendga `allowed_actions` sifatida qaytadigan ro'yxat).
 Ikkalasi bir-biridan uzilib qolsa natija jimgina buziladi — foydalanuvchiga
 tugma ko'rinadi, bosilganda 403 keladi, yoki teskarisi. Shuning uchun zanjir

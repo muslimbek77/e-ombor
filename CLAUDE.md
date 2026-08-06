@@ -32,20 +32,22 @@ npm run dev
 |---|---|
 | Tasdiqlash zanjiri, tahrirlanadigan holatlar, SoD to'plami | `backend/api/workflow.py` |
 | Nazorat rolining global yozish taqiqi | `backend/api/permissions.py` + `settings.py: DEFAULT_PERMISSION_CLASSES` |
-| Rol to'plamlari, ko'rish doirasi, endpointlar | `backend/api/views.py` (boshidagi konstantalar) |
+| Rol to'plamlari | `backend/api/roles.py` |
+| Ko'rish doirasi (`branch_scope`) | `backend/api/scope.py` |
+| Endpointlar | `backend/api/views/` (domen bo'yicha) |
 | Modellar | `backend/api/models.py` |
 | Frontend rol nusxasi (faqat UI uchun) | `frontend/src/lib/permissions.ts` |
 | Tizim mantiqining to'liq bayoni | `docs/TIZIM.md` |
 
 ## Qoidalar
 
-**Zanjir faqat `workflow.py` da.** Ilgari u `views.py` va `serializers.py` da
+**Zanjir faqat `workflow.py` da.** Ilgari u `views/` va `serializers.py` da
 takrorlangan edi va ajralib qolishi mumkin edi — natijada foydalanuvchiga
 bosilganda 403 beradigan tugma ko'rinardi. Endi ikkalasi ham shu fayldan
 o'qiydi. Yangi bosqich qo'shilsa: `workflow.py` + `models.py: Document.STATUSES`
 + migration + frontend `types/document.ts` va `documentUtils.ts`.
 
-**Ko'rish va yozish alohida.** `GLOBAL_SCOPE_ROLES` (`views.py`) faqat
+**Ko'rish va yozish alohida.** `GLOBAL_SCOPE_ROLES` (`roles.py`) faqat
 `branch_scope()` ga ta'sir qiladi — ya'ni kim nimani ko'radi. Yozish huquqi
 o'sha yerdagi alohida to'plamlar (`PAYMENT_ROLES`, `STOCK_MOVEMENT_ROLES` va
 h.k.) bilan tekshiriladi. Ikkalasini aralashtirmaslik kerak.
@@ -59,7 +61,7 @@ to'plami o'zgarsa ikkala joy ham yangilanadi.
 e'lon qilsa default butunlay almashadi, shuning uchun qo'shimcha ruxsat sinfi
 kerak bo'lsa u `views.DEFAULT_PERMISSIONS` USTIGA qo'shiladi, o'rniga emas.
 Istisno kerak bo'lsa view'ga `control_role_may_write = True` yoziladi. Buni
-`tests_api_contract.py` urls.py bo'yicha tekshiradi.
+`tests_control_role.py` urls.py bo'yicha tekshiradi.
 
 **Hujjat `created`, `revision` va `rejected` dan tashqarida muzlaydi.**
 Tahrirlash va o'chirish 409 qaytaradi — admin ham istisno emas. Xuddi shu
@@ -76,7 +78,7 @@ o'zgargan bo'lsa oldingi tasdiqlar boshqa hujjatga tegishli bo'lib qoladi.
 COMMENT_REQUIRED_ACTIONS`).
 
 **Qabul qoldiqni o'zgartiradi.** `delivering → received` (`advance`) hujjatning
-xarid qatorlarini omborga kirim qiladi (`views.py: receive_purchase_items`) —
+xarid qatorlarini omborga kirim qiladi (`stock.py: receive_purchase_items`) —
 status va `StockMovement` bitta transaksiyada. Qatorlari bor hujjatda so'rovdagi
 `warehouse` majburiy va taxmin qilinmaydi (filialda bitta ombor bo'lsa ham):
 xato kirim keyin faqat teskari harakat bilan tuzatiladi. Qatorsiz hujjatda

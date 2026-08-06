@@ -2,8 +2,7 @@
 
 Bu hujjat platformaning ishlash mantiqini bir joyda bayon qiladi: kim nima
 qila oladi, hujjat qanday yo'ldan o'tadi, ma'lumot qanday chegaralanadi va
-nima tekshirilgan. Har bir da'vo `backend/api/tests_api_contract.py` va
-`backend/api/tests_stock_movements.py` dagi testlar bilan qo'llab-quvvatlangan
+nima tekshirilgan. Har bir da'vo `backend/api/tests_*.py` dagi testlar bilan qo'llab-quvvatlangan
 (jami 143 ta test).
 
 ---
@@ -27,7 +26,9 @@ Frontend uch qatlamli: `api/` (axios chaqiruvlari) → `hooks/` (TanStack Query)
 → `pages/`. Har bir domen shu qolipni takrorlaydi.
 
 Backend bitta `api` ilovasidan iborat: `models.py` (22 model), `serializers.py`,
-`views.py` (51 endpoint), `urls.py`.
+`views/` paketi (51 endpoint, domen bo'yicha bo'lingan), `urls.py`, va
+yordamchi modullar: `roles.py`, `scope.py`, `permissions.py`, `audit.py`,
+`notifications.py`, `numbering.py`, `freeze.py`, `stock.py`, `exports.py`.
 
 ---
 
@@ -105,7 +106,7 @@ bo'lishi mumkin.
 ### `is_staff` — admin bo'lishning ikkinchi yo'li
 
 `is_staff` Django'ning standart bayrog'i va `roles` dan **mustaqil** maydon
-(`models.py`, default `False`). `views.py: is_admin()` ikkalasini ham qabul
+(`models.py`, default `False`). `roles.py: is_admin()` ikkalasini ham qabul
 qiladi:
 
 ```python
@@ -121,7 +122,7 @@ aks holda tizimga hech kim kira olmasdi.
 Bayroq faqat ikki yo'l bilan yoqiladi: `createsuperuser`, yoki admin `/users`
 bo'limidan qo'lda bergani. O'zini o'zi ko'tarish yopiq — ro'yxatdan o'tish
 serializerida `is_staff` maydoni umuman yo'q, profil tahrirlashda esa u
-`roles` bilan birga `read_only`. Buni `tests_api_contract.py` tekshiradi:
+`roles` bilan birga `read_only`. Buni `tests_auth.py` tekshiradi:
 prorab o'ziga `{"roles": ["admin"], "is_staff": true}` yuborsa ham hech nima
 o'zgarmaydi.
 
@@ -129,7 +130,8 @@ o'zgarmaydi.
 
 O'qish barcha autentifikatsiyadan o'tgan foydalanuvchilarga ochiq (filial
 chegarasi doirasida). Quyidagi jadval **o'zgartirish** huquqini ko'rsatadi.
-Manba: `backend/api/views.py` boshidagi rol to'plamlari.
+Manba: `backend/api/roles.py` dagi rol to'plamlari, darvozalar esa
+`permissions.py` da.
 
 `admin` ustuni jadvalda yo'q — `is_admin()` har bir tekshiruvda birinchi
 bo'lib `True` qaytaradi, ya'ni admin hamma katakda ✅.
@@ -211,7 +213,7 @@ o'zgarsa, ikkala joyni ham yangilash kerak.
 
 ## 5. Filial izolyatsiyasi
 
-Bu tizimning eng muhim qoidasi. `views.py: branch_scope()` uchta holatni
+Bu tizimning eng muhim qoidasi. `scope.py: branch_scope()` uchta holatni
 ajratadi:
 
 | Foydalanuvchi | Ko'radigan ma'lumot |
@@ -221,7 +223,7 @@ ajratadi:
 | Filiali bor xodim | Faqat o'z filiali |
 | Filiali yo'q hisob | Hech nima (bo'sh ro'yxat) |
 
-Markaziy rollar (`views.py: GLOBAL_SCOPE_ROLES`) ikki sababga ko'ra shunday.
+Markaziy rollar (`roles.py: GLOBAL_SCOPE_ROLES`) ikki sababga ko'ra shunday.
 
 Birinchisi — **tashkilot bo'ylab qaror**: rais barcha filial hujjatlarini
 tasdiqlaydi, xaridlar bo'limi qaror qabul qilishda butun ombor holatiga
@@ -260,7 +262,7 @@ murojaatlarini, filialsiz esa faqat o'zi yaratganini ko'radi.
 
 `Document` — o'n bir holatli avtomat. Har bir o'tish uchun aniq rol talab
 qilinadi. Qoidalar **faqat `api/workflow.py`** da ta'riflangan: haqiqiy
-tekshiruv (`views.py`) va frontendga qaytadigan `allowed_actions`
+tekshiruv (`views/documents.py`) va frontendga qaytadigan `allowed_actions`
 (`serializers.py`) ikkalasi ham shu fayldan o'qiydi. Ilgari bu ikki nusxada
 edi va ajralib qolsa foydalanuvchiga bosilganda 403 beradigan tugma
 ko'rinardi.
@@ -541,9 +543,19 @@ python manage.py test api
 | Fayl | Qamrov |
 |---|---|
 | `tests_stock_movements.py` | Ombor harakatlari, qulflash, yetarsiz qoldiq (30 test) |
-| `tests_api_contract.py` | Auth oqimi, bo'sh baza, rol matritsasi, nazorat rolining yozish taqiqi va SoD, tasdiqlash zanjiri, hujjat muzlatilishi, filial izolyatsiyasi, raqam generatsiyasi, hujjat izohlari, tuzatishga qaytarish va qabul (113 test) |
+| `tests_auth.py` | Register / login / refresh / logout / parol, foydalanuvchi boshqaruvi (13 test) |
+| `tests_api_surface.py` | Token talabi, bo'sh baza, filtrlar, raqam generatsiyasi (11 test) |
+| `tests_role_matrix.py` | Kim nima yoza oladi — ma'lumotnoma va moliya (8 test) |
+| `tests_branch_isolation.py` | Filial chegarasi, markaziy rollar istisnosi (10 test) |
+| `tests_control_role.py` | Nazorat rolining yozish taqiqi va SoD (15 test) |
+| `tests_workflow.py` | Tasdiqlash zanjiri, tuzatishga qaytarish, ombor qabuli (35 test) |
+| `tests_document_freeze.py` | Muzlatish va `PurchaseOrder` qatorlari (8 test) |
+| `tests_document_comments.py` | Hujjatga bog'langan yozishma (10 test) |
+| `tests_notifications.py` | Bildirishnoma faqat egasiga ko'rinishi (3 test) |
 
-`tests_api_contract.py` da har bir tekshiruv **kutilgan** xulqni tasdiqlaydi.
+Har bir tekshiruv **kutilgan** xulqni tasdiqlaydi. Umumiy tayyorgarlik
+(`BaseAPITestCase`, ikkita filial, har rol uchun foydalanuvchi) —
+`tests_base.py` da.
 Yiqilgan test — tuzatilishi kerak bo'lgan xato, testni moslashtirish emas.
 
 ---
@@ -554,7 +566,7 @@ Quyidagilar hozircha bajarilmagan va keyingi bosqichga qoladi:
 
 1. **Ma'lumotnoma bazasi rollari qat'iy.** Material, ombor va manzilni faqat
    admin o'zgartira oladi. Agar amalda buni omborchi ham qilishi kerak bo'lsa,
-   `views.py` dagi `AdminOnlyWrite` ni tegishli rol to'plamiga almashtirish
+   `permissions.py` dagi `AdminOnlyWrite` ni tegishli rol to'plamiga almashtirish
    yetarli (frontenddagi `REFERENCE_DATA_ROLES` bilan birga).
 
 2. **Ombor ma'lumotnomasi filialga bog'lanmagan.** `Material` butun tizim
