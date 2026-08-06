@@ -119,8 +119,13 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    # `ControlRoleReadOnly` ataylab shu yerda — nazorat rolining yozish taqiqi
+    # butun API yuzasiga bir joydan qo'llanadi. Har bir view'da alohida
+    # sanalsa, bittasi unutilardi va taqiq jimgina teshik qoldirardi.
+    # View'lar buni `views.DEFAULT_PERMISSIONS` orqali saqlab qoladi.
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
+        'api.permissions.ControlRoleReadOnly',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',

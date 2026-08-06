@@ -1,3 +1,5 @@
+import type { DocStatus } from "./document";
+
 export interface PurchaseOrderItem {
   id: number;
   purchase_order: number;
@@ -20,7 +22,8 @@ export interface PurchaseOrder {
   document: number;
   doc_number: string;
   title: string;
-  doc_status: string;
+  /** Buyurtma hujjat holatiga ergashadi — muzlagan hujjatning qatorlari ham yopiq. */
+  doc_status: DocStatus;
   total_amount: string;
   supplier: number | null;
   supplier_name: string | null;

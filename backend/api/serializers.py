@@ -26,7 +26,7 @@ from .models import (
     Warehouse,
 )
 
-from .workflow import allowed_actions_for
+from .workflow import CONTROL_ROLE, ROLES_CONFLICTING_WITH_CONTROL, allowed_actions_for
 
 User = get_user_model()
 ARCHIVE_VISIBLE_ROLES = {"admin", "procurement", "branch_manager"}
@@ -228,7 +228,50 @@ class DocumentWorkflowSerializer(serializers.Serializer):
     comment = serializers.CharField(required=False, allow_blank=True)
 
 
-class UserCreateSerializer(serializers.ModelSerializer):
+class ControlRoleSeparationMixin:
+    """
+    Vazifalar ajratilishi (SoD): nazorat roli yolg'iz turadi.
+
+    `anticorruption` zanjirning boshqa roli bilan bir foydalanuvchida
+    birlashsa, nazorat o'zi tekshiradigan jarayonning ishtirokchisiga
+    aylanadi — masalan xarid so'rovini o'zi jo'natib, o'zi tasdiqlaydi.
+    Ziddiyatli rollar ro'yxati `workflow.py` da zanjirning o'zidan hosil
+    bo'ladi, ya'ni yangi bosqich qo'shilsa bu tekshiruv eskirmaydi.
+
+    `is_staff` ham shu yerda: u rol emas, lekin `is_admin()` uchun roldan
+    farqi yo'q — nazoratga berilsa taqiq ma'nosini yo'qotardi.
+    """
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        # PATCH da yuborilmagan maydon mavjud qiymatida qoladi — tekshiruv
+        # so'rovni emas, natijadagi holatni ko'rishi kerak.
+        roles = set(attrs.get("roles", getattr(instance, "roles", None) or []) or [])
+        if CONTROL_ROLE not in roles:
+            return attrs
+
+        conflicting = sorted(roles & ROLES_CONFLICTING_WITH_CONTROL)
+        if conflicting:
+            raise serializers.ValidationError(
+                {
+                    "roles": (
+                        "Nazorat roli boshqa rol bilan birga berilmaydi "
+                        f"(ziddiyat: {', '.join(conflicting)}). Aks holda nazorat "
+                        "o'zi tekshiradigan jarayonning ishtirokchisiga aylanadi."
+                    )
+                }
+            )
+
+        if attrs.get("is_staff", getattr(instance, "is_staff", False)):
+            raise serializers.ValidationError(
+                {"is_staff": "Nazorat roli `is_staff` bilan birga berilmaydi — bu unga to'liq admin huquqini berardi"}
+            )
+
+        return attrs
+
+
+class UserCreateSerializer(ControlRoleSeparationMixin, serializers.ModelSerializer):
     """Admin panelidan yangi foydalanuvchi yaratish."""
 
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
@@ -245,7 +288,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return User.objects.create_user(password=password, **validated_data)
 
 
-class UserUpdateSerializer(serializers.ModelSerializer):
+class UserUpdateSerializer(ControlRoleSeparationMixin, serializers.ModelSerializer):
     """Admin panelidan foydalanuvchini tahrirlash. Parol faqat berilgan bo'lsa o'zgaradi."""
 
     password = serializers.CharField(write_only=True, required=False, validators=[validate_password])

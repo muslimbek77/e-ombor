@@ -4,6 +4,7 @@ import { useCreateDocument, useDocuments, useExportDocuments } from "../../hooks
 import { DocumentCard } from "./DocumentCard";
 import { DocumentForm } from "./DocumentForm";
 import { STATUS_FILTERS } from "./documentUtils";
+import { useIsControlRole } from "../../lib/permissions";
 import type { DocumentCreatePayload } from "../../types/document";
 
 type StatusFilter = (typeof STATUS_FILTERS)[number]["value"];
@@ -17,6 +18,8 @@ export default function DocumentsPage() {
   const { data: documents = [], isPending, isError } = useDocuments({ archived: showArchived ? "true" : "false" });
   const createDocument = useCreateDocument();
   const exportDocuments = useExportDocuments();
+  // Nazorat roli hujjat yarata olmaydi (server: 403) — u faqat o'qiydi.
+  const isReadOnly = useIsControlRole();
 
   const filteredDocuments = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase();
@@ -36,9 +39,11 @@ export default function DocumentsPage() {
             <p className="mt-0.5 text-sm text-gray-400">{isPending ? "Yuklanmoqda..." : `${filteredDocuments.length} ta hujjat`}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
-              <Plus size={16} /> Hujjat qo'shish
-            </button>
+            {!isReadOnly && (
+              <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
+                <Plus size={16} /> Hujjat qo'shish
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowArchived((value) => !value)}

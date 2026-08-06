@@ -3,6 +3,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { useCreateTicket, useExportTickets, useTickets } from "../../hooks/useTickets";
 import { TicketCard } from "./TicketCard";
 import { TicketForm } from "./TicketForm";
+import { useIsControlRole } from "../../lib/permissions";
 import type { TicketCreatePayload } from "../../types/ticket";
 
 const STATUS_FILTERS = [
@@ -23,6 +24,8 @@ export default function TicketsPage() {
   const { data: tickets = [], isPending, isError } = useTickets();
   const createTicket = useCreateTicket();
   const exportTickets = useExportTickets();
+  // Nazorat roli murojaat ham yarata olmaydi (server: 403).
+  const isReadOnly = useIsControlRole();
 
   const filteredTickets = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase();
@@ -42,9 +45,11 @@ export default function TicketsPage() {
             <p className="mt-0.5 text-sm text-gray-400">{isPending ? "Yuklanmoqda..." : `${filteredTickets.length} ta murojaat`}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
-              <Plus size={16} /> Murojaat qo'shish
-            </button>
+            {!isReadOnly && (
+              <button type="button" onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">
+                <Plus size={16} /> Murojaat qo'shish
+              </button>
+            )}
             <label className="relative">
               <span className="sr-only">Murojaatlarni qidirish</span>
               <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />

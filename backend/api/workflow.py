@@ -62,6 +62,35 @@ WORKFLOW_RULES = {
 }
 
 
+CONTROL_ROLE = "anticorruption"
+
+# Zanjirda qatnashadigan barcha rollar. Qo'lda sanab chiqilmaydi —
+# `WORKFLOW_RULES` dan hosil bo'ladi, ya'ni yangi bosqich qo'shilganda bu
+# to'plam o'zi yangilanadi va vazifalar ajratilishi qoidasi eskirmaydi.
+CHAIN_ROLES = {
+    role
+    for stage in WORKFLOW_RULES.values()
+    for config in stage.values()
+    for role in config["roles"]
+}
+
+# Nazorat roli bilan bir foydalanuvchida birga tura olmaydigan rollar (SoD).
+# `admin` ham shu yerda: u har bir bosqichni bajara oladi, ya'ni nazorat bilan
+# qo'shilsa zanjir bitta odamning qo'lida qoladi.
+ROLES_CONFLICTING_WITH_CONTROL = CHAIN_ROLES - {CONTROL_ROLE}
+
+# Hujjat (va uning material qatorlari) faqat shu holatlarda tahrirlanadi.
+# Zanjir boshlangach summa yoki qatorlar o'zgarsa, allaqachon berilgan
+# tasdiqlar aslida boshqa hujjatga tegishli bo'lib qoladi — tasdiqlash
+# zanjirining butun qiymati shunda. Tuzatish yo'li: `reject`, so'ng `reopen`.
+EDITABLE_STATUSES = {"created", "rejected"}
+
+
+def is_editable(status):
+    """Hujjat shu holatda tahrirlanadimi."""
+    return status in EDITABLE_STATUSES
+
+
 def allowed_actions_for(status, roles, is_staff=False):
     """Berilgan holat va rol to'plami uchun mumkin bo'lgan amallar ro'yxati."""
     role_set = set(roles or [])

@@ -4,9 +4,10 @@ import { Link, useParams } from "react-router-dom";
 import { useDocument, useToggleArchive, useUpdateDocument, useWorkflowAction } from "../../hooks/useDocuments";
 import { useDocumentFiles, useUploadDocumentFile } from "../../hooks/useDocuments";
 import { DocumentForm } from "./DocumentForm";
-import { actionLabel, docTypeLabel, formatFileSize, statusBadgeClass } from "./documentUtils";
+import { actionLabel, docTypeLabel, formatFileSize, isDocumentEditable, statusBadgeClass } from "./documentUtils";
 import { formatDateTime } from "../tickets/ticketUtils";
 import { formatBudget, formatDate } from "../objects/siteUtils";
+import { useIsControlRole } from "../../lib/permissions";
 import type { DocumentUpdatePayload, WorkflowAction } from "../../types/document";
 
 export default function DocumentDetailPage() {
@@ -23,10 +24,15 @@ export default function DocumentDetailPage() {
   const toggleArchive = useToggleArchive();
   const { data: files = [], isPending: isFilesPending } = useDocumentFiles(documentId);
   const uploadFile = useUploadDocumentFile();
+  const isReadOnly = useIsControlRole();
 
   if (!Number.isInteger(documentId) || documentId < 1) return <DetailState>Hujjat ID noto'g'ri.</DetailState>;
   if (isPending) return <DetailState>Yuklanmoqda...</DetailState>;
   if (isError || !document) return <DetailState>Hujjatni yuklashda xatolik yuz berdi.</DetailState>;
+
+  // Zanjirga kirgan hujjat muzlaydi (server: 409), nazorat roli esa umuman
+  // yozmaydi (server: 403). Ikkalasida ham tugmani ko'rsatishning ma'nosi yo'q.
+  const canEdit = !isReadOnly && isDocumentEditable(document.status);
 
   function runAction(action: WorkflowAction, actionComment?: string) {
     workflowAction.mutate(
@@ -68,9 +74,11 @@ export default function DocumentDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-                <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
-              </button>
+              {canEdit && (
+                <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                  <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
+                </button>
+              )}
               {document.can_archive && (
                 <button
                   type="button"
@@ -87,7 +95,7 @@ export default function DocumentDetailPage() {
           {updateDocument.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">O'zgarishlarni saqlab bo'lmadi.</p>}
           {workflowAction.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">Amalni bajarib bo'lmadi.</p>}
 
-          {isEditing ? (
+          {isEditing && canEdit ? (
             <>
               <h2 className="mb-4 text-lg font-bold text-gray-900">Hujjatni tahrirlash</h2>
               <DocumentForm
@@ -100,6 +108,12 @@ export default function DocumentDetailPage() {
             </>
           ) : (
             <DocumentInformation document={document} />
+          )}
+
+          {!canEdit && !isReadOnly && (
+            <p className="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-500">
+              Hujjat tasdiqlash zanjiriga kirgan va tahrirlanmaydi. Tuzatish kerak bo'lsa hujjat rad etiladi va qayta ochiladi.
+            </p>
           )}
 
           {!isEditing && document.allowed_actions.length > 0 && (
@@ -152,9 +166,11 @@ export default function DocumentDetailPage() {
         <section className="rounded-2xl bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-4">
             <h2 className="text-lg font-bold text-gray-900">Fayllar</h2>
-            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadFile.isPending} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60">
-              <Upload size={15} /> {uploadFile.isPending ? "Yuklanmoqda..." : "Fayl yuklash"}
-            </button>
+            {!isReadOnly && (
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadFile.isPending} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60">
+                <Upload size={15} /> {uploadFile.isPending ? "Yuklanmoqda..." : "Fayl yuklash"}
+              </button>
+            )}
             <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" onChange={handleFileChange} />
           </div>
           {uploadFile.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">Fayl yuklab bo'lmadi (PDF, XLSX, XLS, JPG, PNG, 10MB gacha).</p>}

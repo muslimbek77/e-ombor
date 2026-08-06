@@ -26,6 +26,17 @@ export const STATUS_FILTERS = [
   { value: "rejected", label: "Rad etildi" },
 ] as const;
 
+/**
+ * Hujjat faqat shu holatlarda tahrirlanadi — manba `backend/api/workflow.py`
+ * (`EDITABLE_STATUSES`). Zanjir boshlangach hujjat muzlaydi: server boshqa
+ * holatda 409 qaytaradi. Tuzatish yo'li — `reject`, so'ng `reopen`.
+ */
+export const EDITABLE_STATUSES: DocStatus[] = ["created", "rejected"];
+
+export function isDocumentEditable(status: DocStatus) {
+  return EDITABLE_STATUSES.includes(status);
+}
+
 const STATUS_STYLES: Record<DocStatus, string> = {
   created: "bg-gray-100 text-gray-600",
   architecture: "bg-blue-50 text-blue-600",

@@ -14,7 +14,7 @@ kod izohlari o'zbekcha.
 ```bash
 # Backend
 cd backend && source venv/bin/activate
-python manage.py test api          # 84 test — o'zgarishdan keyin shu yuritiladi
+python manage.py test api          # 111 test — o'zgarishdan keyin shu yuritiladi
 python manage.py migrate
 python manage.py seed_demo_data    # demo to'plam + demo loginlar
 python manage.py runserver 0.0.0.0:3000
@@ -30,7 +30,8 @@ npm run dev
 
 | Nima kerak bo'lsa | Qayerda |
 |---|---|
-| Tasdiqlash zanjiri (kim qaysi bosqichda nima qiladi) | `backend/api/workflow.py` |
+| Tasdiqlash zanjiri, tahrirlanadigan holatlar, SoD to'plami | `backend/api/workflow.py` |
+| Nazorat rolining global yozish taqiqi | `backend/api/permissions.py` + `settings.py: DEFAULT_PERMISSION_CLASSES` |
 | Rol to'plamlari, ko'rish doirasi, endpointlar | `backend/api/views.py` (boshidagi konstantalar) |
 | Modellar | `backend/api/models.py` |
 | Frontend rol nusxasi (faqat UI uchun) | `frontend/src/lib/permissions.ts` |
@@ -52,6 +53,17 @@ h.k.) bilan tekshiriladi. Ikkalasini aralashtirmaslik kerak.
 **Frontenddagi `permissions.ts` — himoya emas.** U backend to'plamlarining
 nusxasi, maqsadi — bosilganda 403 beradigan tugmani ko'rsatmaslik. Rol
 to'plami o'zgarsa ikkala joy ham yangilanadi.
+
+**Nazorat roli (`anticorruption`) faqat o'qiydi.** Taqiq global —
+`DEFAULT_PERMISSION_CLASSES` da. DRF'da view o'z `permission_classes` ini
+e'lon qilsa default butunlay almashadi, shuning uchun qo'shimcha ruxsat sinfi
+kerak bo'lsa u `views.DEFAULT_PERMISSIONS` USTIGA qo'shiladi, o'rniga emas.
+Istisno kerak bo'lsa view'ga `control_role_may_write = True` yoziladi. Buni
+`tests_api_contract.py` urls.py bo'yicha tekshiradi.
+
+**Hujjat `created` va `rejected` dan tashqarida muzlaydi.** Tahrirlash va
+o'chirish 409 qaytaradi — admin ham istisno emas. Xuddi shu `PurchaseOrder`
+qatorlariga tegishli. Holatlar ro'yxati `workflow.py: EDITABLE_STATUSES`.
 
 **Ombor harakati o'chirilmaydi.** `stock-movements/` da tafsilot endpointi
 ataylab yo'q. Xato kiritilgan harakat teskari harakat bilan tuzatiladi.

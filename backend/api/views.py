@@ -67,8 +67,15 @@ from .serializers import (
     UserUpdateSerializer,
     WarehouseSerializer,
 )
-from .workflow import WORKFLOW_RULES
+from .permissions import ControlRoleReadOnly
+from .workflow import WORKFLOW_RULES, is_editable
 
+
+# Qo'shimcha ruxsat sinfi kerak bo'lgan view'lar uchun. DRF'da `permission_classes`
+# e'lon qilinsa `DEFAULT_PERMISSION_CLASSES` butunlay almashadi — nazorat rolining
+# yozish taqiqi ham shu bilan tushib qolardi. Shuning uchun qo'shimcha sinf shu
+# to'plamning USTIGA qo'shiladi, o'rniga emas.
+DEFAULT_PERMISSIONS = (permissions.IsAuthenticated, ControlRoleReadOnly)
 
 ADMIN_ROLES = {"admin"}
 # Tashkilot bo'ylab ko'radigan rollar. Bu FAQAT ko'rish doirasi — yozish
@@ -86,7 +93,11 @@ SUPPLIER_ROLES = {"admin", "procurement"}
 INVOICE_ROLES = {"admin", "accountant", "procurement"}
 PAYMENT_ROLES = {"admin", "accountant"}
 SITE_ROLES = {"admin", "branch_manager", "architecture"}
-DOCUMENT_MANAGE_ROLES = {"admin", "procurement", "branch_manager"}
+# Xaridlar bo'limi bu yerda ataylab yo'q. U begona hujjatni o'zi tahrirlamaydi
+# va o'chirmaydi — kamchilikni ko'rsa filial rahbariga aytadi, tuzatishni u
+# kiritadi. Xaridlarning zanjirdagi ta'siri `procurement` bosqichidagi
+# `approve`/`reject` orqali qoladi.
+DOCUMENT_MANAGE_ROLES = {"admin", "branch_manager"}
 
 
 def is_admin(user):
@@ -283,6 +294,32 @@ def notify_branch_roles(branch, roles, title, message, notification_type="info")
         notify_users(filtered, title, message, notification_type)
 
 
+class DocumentFrozen(exceptions.APIException):
+    """Zanjirga kirgan hujjatni o'zgartirishga urinish — 409."""
+
+    status_code = status.HTTP_409_CONFLICT
+
+
+def ensure_document_editable(document):
+    """
+    Hujjat tahrirlanadigan holatdami — aks holda `DocumentFrozen`.
+
+    Ilgari holat umuman tekshirilmasdi: tasdiqlangan, hatto `closed` hujjatning
+    summasi ham o'zgartirilishi mumkin edi. Bunda arxitektura, rais va nazorat
+    bergan tasdiqlar aslida boshqa hujjatga berilgan bo'lib qolardi va
+    zanjirning butun qiymati yo'qolardi. Xato topilsa yo'l bitta: `reject`,
+    so'ng `reopen` — bu izohi va tarixi bilan qayd etiladi.
+
+    403 emas, 409: gap ruxsatda emas, hujjatning holatida. Hatto admin ham
+    `closed` hujjatni tahrirlay olmaydi.
+    """
+    if not is_editable(document.status):
+        raise DocumentFrozen(
+            f"{document.doc_number} hujjati «{document.get_status_display()}» holatida — "
+            "tahrirlash faqat YARATILDI va RAD ETILDI holatlarida mumkin"
+        )
+
+
 class InsufficientStockError(Exception):
     """Omborda yetarli qoldiq bo'lmaganda ko'tariladi."""
 
@@ -383,7 +420,9 @@ class CustomTokenRefreshView(APIView):
 class LogoutView(APIView):
     """Logout - refresh tokenni blacklist qilish."""
 
-    permission_classes = (permissions.IsAuthenticated,)
+    # O'z hisobiga tegishli amal, ish ma'lumoti emas — nazorat roli tizimdan
+    # chiqa olishi kerak.
+    control_role_may_write = True
 
     def post(self, request):
         refresh_token = request.data.get('refresh')
@@ -407,7 +446,8 @@ class LogoutView(APIView):
 
 class ChangePasswordView(APIView):
     """Parolni o'zgartirish."""
-    permission_classes = (permissions.IsAuthenticated,)
+
+    control_role_may_write = True
 
     def post(self, request):
         old_password = request.data.get('old_password')
@@ -474,15 +514,16 @@ class UserRegisterView(generics.CreateAPIView):
 class UserProfileView(generics.RetrieveUpdateAPIView):
     """Foydalanuvchi profili."""
     serializer_class = UserSerializer
-    permission_classes = (permissions.IsAuthenticated,)
-    
+    # Faqat o'z ismi, telefoni va shu kabilar. Rol, filial va `is_staff`
+    # `UserSerializer` da read-only, ya'ni bu yerdan imtiyoz ko'tarilmaydi.
+    control_role_may_write = True
+
     def get_object(self):
         return self.request.user
 
 
 class UserListView(generics.ListCreateAPIView):
     """Foydalanuvchilar ro'yxati va yaratish (faqat admin)."""
-    permission_classes = (permissions.IsAuthenticated,)
     queryset = User.objects.select_related("branch").order_by("-created_at")
 
     def get_serializer_class(self):
@@ -507,7 +548,6 @@ class UserListView(generics.ListCreateAPIView):
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Foydalanuvchi tafsilotlari, tahrirlash va o'chirish (faqat admin)."""
-    permission_classes = (permissions.IsAuthenticated,)
     queryset = User.objects.select_related("branch")
 
     def get_serializer_class(self):
@@ -546,7 +586,6 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class DashboardView(APIView):
     """Dashboard statistikalari."""
-    permission_classes = (permissions.IsAuthenticated,)
     
     def get(self, request):
         user = request.user
@@ -610,8 +649,6 @@ class DashboardView(APIView):
 class AnalyticsOverviewView(APIView):
     """Analytics va hisobotlar uchun agregatsiya endpointi."""
 
-    permission_classes = (permissions.IsAuthenticated,)
-
     def get(self, request):
         user = request.user
         documents = branch_scope(Document.objects.select_related("branch", "site"), user)
@@ -647,7 +684,6 @@ class AnalyticsOverviewView(APIView):
 class DocumentListCreateView(generics.ListCreateAPIView):
     """Hujjatlar ro'yxati va yaratish."""
     serializer_class = DocumentSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     
     def get_queryset(self):
         user = self.request.user
@@ -707,7 +743,11 @@ class DocumentListCreateView(generics.ListCreateAPIView):
 class DocumentWorkflowActionView(APIView):
     """Hujjat workflow amallari."""
 
-    permission_classes = (permissions.IsAuthenticated,)
+    # Nazorat rolining yozish taqiqidan yagona ish-mazmunli istisno: o'z
+    # bosqichida qaror qabul qilish uning asosiy vazifasi. Kim qaysi amalni
+    # bajara olishi baribir `WORKFLOW_RULES` bilan tekshiriladi — ya'ni bu
+    # istisno nazoratga zanjirning boshqa bosqichini ochib bermaydi.
+    control_role_may_write = True
 
     def post(self, request, pk):
         serializer = DocumentWorkflowSerializer(data=request.data)
@@ -781,8 +821,6 @@ class DocumentWorkflowActionView(APIView):
 class DocumentArchiveToggleView(APIView):
     """Hujjatni arxivlash yoki arxivdan chiqarish."""
 
-    permission_classes = (permissions.IsAuthenticated,)
-
     def post(self, request, pk):
         document = branch_scope(
             Document.objects.select_related("created_by", "branch", "site"),
@@ -818,8 +856,6 @@ class DocumentArchiveToggleView(APIView):
 
 class DocumentsExportView(APIView):
     """Hujjatlarni CSV eksport qilish."""
-
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
         queryset = branch_scope(
@@ -875,7 +911,6 @@ class DocumentsExportView(APIView):
 class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Hujjat tahrirlash va o'chirish."""
     serializer_class = DocumentSerializer
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
         return branch_scope(
@@ -885,14 +920,18 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def _ensure_can_manage(self, document):
         """
-        Hujjatni faqat muallifi yoki hujjat oqimiga mas'ul rollar
-        o'zgartira/o'chira oladi. Ilgari o'z filialidagi istalgan xodim
-        begona hujjatni o'chirib yubora olardi.
+        Ikki mustaqil shart: KIM va QAYSI HOLATDA.
+
+        Kim — muallifi yoki `DOCUMENT_MANAGE_ROLES`; ilgari o'z filialidagi
+        istalgan xodim begona hujjatni o'chirib yubora olardi. Holat —
+        `ensure_document_editable`: zanjir boshlangach hujjat muzlaydi.
+        Ikkalasi alohida javob beradi (403 va 409), chunki foydalanuvchi
+        uchun bular boshqa-boshqa muammo.
         """
         user = self.request.user
-        if document.created_by_id == user.id or has_any_role(user, DOCUMENT_MANAGE_ROLES):
-            return
-        raise exceptions.PermissionDenied("Bu hujjatni o'zgartirish uchun sizda ruxsat yo'q")
+        if not (document.created_by_id == user.id or has_any_role(user, DOCUMENT_MANAGE_ROLES)):
+            raise exceptions.PermissionDenied("Bu hujjatni o'zgartirish uchun sizda ruxsat yo'q")
+        ensure_document_editable(document)
 
     def update(self, request, *args, **kwargs):
         self._ensure_can_manage(self.get_object())
@@ -919,7 +958,6 @@ def _purchase_order_write_allowed(user):
 
 class PurchaseOrderListView(generics.ListCreateAPIView):
     """Xarid buyurtmalari ro'yxati va yaratish."""
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get_serializer_class(self):
         return PurchaseOrderCreateSerializer if self.request.method == "POST" else PurchaseOrderSerializer
@@ -941,6 +979,10 @@ class PurchaseOrderListView(generics.ListCreateAPIView):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Hujjat muzlagan bo'lsa unga yangi material qatorlarini ilib qo'yish ham
+        # yopiq — aks holda hujjatning o'zi qulflanadi-yu, summani belgilaydigan
+        # qatorlar ochiq qolardi.
+        ensure_document_editable(serializer.validated_data["document"])
         with transaction.atomic():
             purchase_order = serializer.save()
 
@@ -956,7 +998,6 @@ class PurchaseOrderListView(generics.ListCreateAPIView):
 
 class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Xarid buyurtmasi tafsilotlari, tahrirlash va o'chirish."""
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get_serializer_class(self):
         return PurchaseOrderUpdateSerializer if self.request.method in ("PUT", "PATCH") else PurchaseOrderSerializer
@@ -978,6 +1019,7 @@ class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
+        ensure_document_editable(instance.document)
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
@@ -1000,6 +1042,7 @@ class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
             )
 
         instance = self.get_object()
+        ensure_document_editable(instance.document)
         # `doc_number` ni ham yozamiz: buyurtma o'chgach jurnal uni bazadan topa
         # olmaydi va nomni shu yerdan oladi (serializers.AUDIT_DETAIL_LABEL_KEYS).
         create_audit_log(
@@ -1017,14 +1060,14 @@ class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
 class MaterialListView(generics.ListCreateAPIView):
     """Materiallar ro'yxati va yaratish."""
     serializer_class = MaterialSerializer
-    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (AdminOnlyWrite,)
     queryset = Material.objects.all()
 
 
 class MaterialDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Material tahrirlash va o'chirish."""
     serializer_class = MaterialSerializer
-    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (AdminOnlyWrite,)
     queryset = Material.objects.all()
 
 
@@ -1032,7 +1075,7 @@ class MaterialDetailView(generics.RetrieveUpdateDestroyAPIView):
 class WarehouseListView(generics.ListCreateAPIView):
     """Omborxonalar ro'yxati va yaratish."""
     serializer_class = WarehouseSerializer
-    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (AdminOnlyWrite,)
     queryset = Warehouse.objects.select_related("branch").all()
 
     def get_queryset(self):
@@ -1042,7 +1085,7 @@ class WarehouseListView(generics.ListCreateAPIView):
 class WarehouseDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Omborxona tahrirlash va o'chirish."""
     serializer_class = WarehouseSerializer
-    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (AdminOnlyWrite,)
     queryset = Warehouse.objects.select_related("branch").all()
 
     def get_queryset(self):
@@ -1056,7 +1099,6 @@ class WarehouseDetailView(generics.RetrieveUpdateDestroyAPIView):
 class InventoryListView(generics.ListCreateAPIView):
     """Ombor zaxiralari ro'yxati."""
     serializer_class = InventoryItemSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     
     def get_queryset(self):
         queryset = branch_scope(
@@ -1113,7 +1155,6 @@ class InventoryListView(generics.ListCreateAPIView):
 
 class InventoryUpdateView(APIView):
     """Ombor zaxirasini yangilash."""
-    permission_classes = (permissions.IsAuthenticated,)
 
     def patch(self, request, pk):
         if not can_manage_stock(request.user):
@@ -1169,8 +1210,6 @@ class InventoryUpdateView(APIView):
 
 class StockMovementListView(generics.ListCreateAPIView):
     """Materiallar harakati tarixi va yangi harakat yaratish."""
-
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -1282,8 +1321,6 @@ class StockMovementListView(generics.ListCreateAPIView):
 class InventoryExportView(APIView):
     """Inventory ni CSV eksport qilish."""
 
-    permission_classes = (permissions.IsAuthenticated,)
-
     def get(self, request):
         queryset = branch_scope(
             InventoryItem.objects.select_related("warehouse", "warehouse__branch", "material"),
@@ -1320,7 +1357,7 @@ class InventoryExportView(APIView):
 class ConstructionSiteListView(generics.ListCreateAPIView):
     """Qurilish obyektlari ro'yxati va yaratish."""
     serializer_class = ConstructionSiteSerializer
-    permission_classes = (permissions.IsAuthenticated, SiteWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (SiteWrite,)
     queryset = ConstructionSite.objects.all()
     
     def get_queryset(self):
@@ -1339,7 +1376,7 @@ class ConstructionSiteListView(generics.ListCreateAPIView):
 class ConstructionSiteDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Qurilish obyekti tahrirlash va o'chirish."""
     serializer_class = ConstructionSiteSerializer
-    permission_classes = (permissions.IsAuthenticated, SiteWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (SiteWrite,)
     queryset = ConstructionSite.objects.select_related("branch", "prorab")
 
     def get_queryset(self):
@@ -1350,14 +1387,14 @@ class ConstructionSiteDetailView(generics.RetrieveUpdateDestroyAPIView):
 class BranchListView(generics.ListCreateAPIView):
     """Filiallar ro'yxati."""
     serializer_class = BranchSerializer
-    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (AdminOnlyWrite,)
     queryset = Branch.objects.all().order_by("name")
 
 
 class BranchDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Filial tahrirlash va o'chirish."""
     serializer_class = BranchSerializer
-    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (AdminOnlyWrite,)
     queryset = Branch.objects.all()
 
 
@@ -1365,14 +1402,14 @@ class BranchDetailView(generics.RetrieveUpdateDestroyAPIView):
 class SupplierListView(generics.ListCreateAPIView):
     """Etkazib beruvchilar ro'yxati."""
     serializer_class = SupplierSerializer
-    permission_classes = (permissions.IsAuthenticated, SupplierWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (SupplierWrite,)
     queryset = Supplier.objects.all().order_by("name")
 
 
 class SupplierDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Etkazib beruvchi tahrirlash va o'chirish."""
     serializer_class = SupplierSerializer
-    permission_classes = (permissions.IsAuthenticated, SupplierWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (SupplierWrite,)
     queryset = Supplier.objects.all()
 
 
@@ -1380,7 +1417,6 @@ class SupplierDetailView(generics.RetrieveUpdateDestroyAPIView):
 class NotificationListView(generics.ListAPIView):
     """Bildirishnomalar ro'yxati."""
     serializer_class = NotificationSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     
     def get_queryset(self):
         return Notification.objects.filter(user=self.request.user).order_by("-created_at")
@@ -1388,8 +1424,9 @@ class NotificationListView(generics.ListAPIView):
 
 class NotificationMarkReadView(generics.UpdateAPIView):
     """Bildirishnomani o'qilgan deb belgilash."""
-    permission_classes = (permissions.IsAuthenticated,)
-    
+    # O'z bildirishnomasi — ish ma'lumoti emas.
+    control_role_may_write = True
+
     def post(self, request, pk=None):
         notification = Notification.objects.filter(
             user=request.user, id=pk
@@ -1403,8 +1440,8 @@ class NotificationMarkReadView(generics.UpdateAPIView):
 
 class NotificationMarkAllReadView(APIView):
     """Barcha bildirishnomalarni o'qilgan deb belgilash."""
-    permission_classes = (permissions.IsAuthenticated,)
-    
+    control_role_may_write = True
+
     def post(self, request):
         Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({'message': 'Barcha bildirishnomalar o\'qilgan deb belgilandi'})
@@ -1414,7 +1451,6 @@ class AuditLogListView(generics.ListAPIView):
     """Audit log ro'yxati."""
 
     serializer_class = AuditLogSerializer
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
         queryset = scoped_audit_logs(self.request.user)
@@ -1438,21 +1474,20 @@ class AuditLogListView(generics.ListAPIView):
 class AddressListView(generics.ListCreateAPIView):
     """Manzillar ro'yxati."""
     serializer_class = AddressSerializer
-    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (AdminOnlyWrite,)
     queryset = Address.objects.all()
 
 
 class AddressDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Manzil tahrirlash va o'chirish."""
     serializer_class = AddressSerializer
-    permission_classes = (permissions.IsAuthenticated, AdminOnlyWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (AdminOnlyWrite,)
     queryset = Address.objects.all()
 
 
 # --- Document File Views ---
 class DocumentFileListView(generics.ListAPIView):
     """Hujjat fayllari ro'yxati."""
-    permission_classes = (permissions.IsAuthenticated,)
     serializer_class = DocumentFileSerializer
     
     def get_queryset(self):
@@ -1466,7 +1501,6 @@ class DocumentFileListView(generics.ListAPIView):
 
 class DocumentFileUploadView(APIView):
     """Hujjatga fayl yuklash."""
-    permission_classes = (permissions.IsAuthenticated,)
     
     def post(self, request, doc_pk):
         # Fayllar ro'yxati filial bo'yicha filtrlanadi; yuklash ham shunday
@@ -1521,7 +1555,6 @@ def _contract_write_allowed(user):
 
 class ContractListView(generics.ListCreateAPIView):
     """Shartnomalar ro'yxati va yaratish."""
-    permission_classes = (permissions.IsAuthenticated,)
     serializer_class = ContractSerializer
 
     def get_queryset(self):
@@ -1553,7 +1586,6 @@ class ContractListView(generics.ListCreateAPIView):
 
 class ContractDetailView(generics.RetrieveUpdateAPIView):
     """Shartnoma tafsilotlari va tahrirlash."""
-    permission_classes = (permissions.IsAuthenticated,)
     serializer_class = ContractSerializer
 
     def get_queryset(self):
@@ -1583,7 +1615,7 @@ class ContractDetailView(generics.RetrieveUpdateAPIView):
 class InvoiceListView(generics.ListCreateAPIView):
     """Hisob-fakturalar ro'yxati."""
     serializer_class = InvoiceSerializer
-    permission_classes = (permissions.IsAuthenticated, InvoiceWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (InvoiceWrite,)
     queryset = Invoice.objects.select_related("document", "contract", "document__branch").order_by("-invoice_date")
 
     def get_queryset(self):
@@ -1593,7 +1625,7 @@ class InvoiceListView(generics.ListCreateAPIView):
 class InvoiceDetailView(generics.RetrieveUpdateAPIView):
     """Hisob-faktura tafsilotlari."""
     serializer_class = InvoiceSerializer
-    permission_classes = (permissions.IsAuthenticated, InvoiceWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (InvoiceWrite,)
     queryset = Invoice.objects.select_related("document", "contract", "document__branch").order_by("-invoice_date")
 
     def get_queryset(self):
@@ -1603,7 +1635,6 @@ class InvoiceDetailView(generics.RetrieveUpdateAPIView):
 # --- Payment Views ---
 class PaymentListView(generics.ListAPIView):
     """To'lovlar ro'yxati."""
-    permission_classes = (permissions.IsAuthenticated,)
     serializer_class = PaymentSerializer
     
     def get_queryset(self):
@@ -1617,7 +1648,7 @@ class PaymentListView(generics.ListAPIView):
 class PaymentCreateView(generics.CreateAPIView):
     """To'lov yaratish."""
     serializer_class = PaymentSerializer
-    permission_classes = (permissions.IsAuthenticated, PaymentWrite)
+    permission_classes = DEFAULT_PERMISSIONS + (PaymentWrite,)
     
     def perform_create(self, serializer):
         invoice_id = self.kwargs.get('invoice_pk')
@@ -1663,7 +1694,6 @@ class PaymentCreateView(generics.CreateAPIView):
 class ProductionRequestListView(generics.ListCreateAPIView):
     """Ishlab chiqarish zayavkalari ro'yxati."""
     serializer_class = ProductionRequestSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     
     def get_queryset(self):
         return branch_scope(
@@ -1688,7 +1718,6 @@ class ProductionRequestListView(generics.ListCreateAPIView):
 class ProductionRequestDetailView(generics.RetrieveUpdateAPIView):
     """Ishlab chiqarish zayavka tafsilotlari."""
     serializer_class = ProductionRequestSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     
     def get_queryset(self):
         return branch_scope(
@@ -1702,7 +1731,6 @@ class ProductionRequestDetailView(generics.RetrieveUpdateAPIView):
 class TicketListView(generics.ListCreateAPIView):
     """Murojaatlar ro'yxati."""
     serializer_class = TicketSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     
     def get_queryset(self):
         user = self.request.user
@@ -1754,7 +1782,6 @@ class TicketListView(generics.ListCreateAPIView):
 class TicketDetailView(generics.RetrieveUpdateAPIView):
     """Murojaat tafsilotlari."""
     serializer_class = TicketSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     
     def get_queryset(self):
         user = self.request.user
@@ -1773,8 +1800,6 @@ class TicketDetailView(generics.RetrieveUpdateAPIView):
 
 class TicketsExportView(APIView):
     """Murojaatlarni CSV eksport qilish."""
-
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
         user = request.user

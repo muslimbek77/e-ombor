@@ -25,7 +25,19 @@ export const SUPPLIER_ROLES: UserRole[] = ["admin", "procurement"];
 export const INVOICE_ROLES: UserRole[] = ["admin", "accountant", "procurement"];
 export const PAYMENT_ROLES: UserRole[] = ["admin", "accountant"];
 export const SITE_ROLES: UserRole[] = ["admin", "branch_manager", "architecture"];
-export const DOCUMENT_MANAGE_ROLES: UserRole[] = ["admin", "procurement", "branch_manager"];
+/**
+ * Xaridlar bo'limi bu yerda ataylab yo'q: u begona hujjatni o'zi tahrirlamaydi
+ * va o'chirmaydi — filial rahbariga aytadi, tuzatishni u kiritadi.
+ */
+export const DOCUMENT_MANAGE_ROLES: UserRole[] = ["admin", "branch_manager"];
+
+/**
+ * Nazorat roli. Serverda (`api/permissions.py: ControlRoleReadOnly`) unga
+ * SAFE_METHODS dan boshqa hamma narsa yopiq — yagona ish-mazmunli istisno
+ * `documents/<id>/workflow/`. Bu yerda uni bilishimiz kerak, aks holda
+ * bosilganda 403 beradigan tugmalarni ko'rsatib qo'yardik.
+ */
+export const CONTROL_ROLE: UserRole = "anticorruption";
 
 /**
  * Ma'lumotnoma bazasi — filial, material, ombor, manzil. Ko'rish hammaga
@@ -71,12 +83,32 @@ export function isAdmin(user: RoleBearer | null | undefined): boolean {
   return Boolean(user.is_staff) || (user.roles ?? []).includes("admin");
 }
 
+/**
+ * Nazorat roli — tizimda faqat o'qiydi. `isAdmin` dan farqli o'laroq bu yerda
+ * `is_staff` tekshirilmaydi: serverda ham u nazoratga imtiyoz bermaydi, va
+ * ikkala rolni bir hisobda birlashtirish umuman taqiqlangan (SoD).
+ */
+export function isControlRole(user: RoleBearer | null | undefined): boolean {
+  return Boolean(user) && (user!.roles ?? []).includes(CONTROL_ROLE);
+}
+
 /** Admin hamma narsaga kiradi; qolganlarda rollardan bittasi mos kelishi yetarli. */
 export function hasRole(user: RoleBearer | null | undefined, allowed: readonly UserRole[]): boolean {
   if (!user) return false;
   if (isAdmin(user)) return true;
   const roles = user.roles ?? [];
   return allowed.some((role) => roles.includes(role));
+}
+
+/**
+ * Yozish darvozasi — `hasRole` dan farqi shundaki, nazorat roli bu yerda
+ * har doim `false` oladi. Ikkalasi ataylab ajratilgan: nazorat bo'limlarni
+ * KO'RADI (`canAccessPath` — hisob-faktura, xarid, audit log uning ish
+ * quroli), lekin ularda hech nimani o'zgartira olmaydi.
+ */
+export function canWrite(user: RoleBearer | null | undefined, allowed: readonly UserRole[]): boolean {
+  if (isControlRole(user)) return false;
+  return hasRole(user, allowed);
 }
 
 export function canAccessPath(user: RoleBearer | null | undefined, href: string): boolean {
@@ -87,11 +119,22 @@ export function canAccessPath(user: RoleBearer | null | undefined, href: string)
 
 // ── Hook'lar ───────────────────────────────────────────────────────────────────
 
-/** Joriy foydalanuvchi berilgan rollardan biriga egami. */
+/**
+ * Joriy foydalanuvchi shu bo'limda nimadir o'zgartira oladimi.
+ *
+ * Chaqiruvchilar buni yozish tugmalarini ko'rsatish uchun ishlatadi, shuning
+ * uchun u `canWrite` ga tayanadi va nazorat roliga hech qachon `true`
+ * qaytarmaydi. Bo'lim KO'RINISHI uchun `canAccessPath` bor.
+ */
 export function useHasRole(allowed: readonly UserRole[]): boolean {
-  return hasRole(useAuthStore((state) => state.user), allowed);
+  return canWrite(useAuthStore((state) => state.user), allowed);
 }
 
 export function useIsAdmin(): boolean {
   return isAdmin(useAuthStore((state) => state.user));
+}
+
+/** Joriy foydalanuvchi nazorat rolimi — interfeys unga faqat o'qishni ko'rsatadi. */
+export function useIsControlRole(): boolean {
+  return isControlRole(useAuthStore((state) => state.user));
 }
