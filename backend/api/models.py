@@ -148,6 +148,7 @@ class Warehouse(models.Model):
         db_table = 'warehouses'
         verbose_name = 'Omborxona'
         verbose_name_plural = 'Omborxonalar'
+        ordering = ['id']
     
     def __str__(self):
         return f"{self.code} - {self.name}"
@@ -422,6 +423,7 @@ class Address(models.Model):
         verbose_name = 'Manzil'
         verbose_name_plural = 'Manzillar'
         unique_together = ('city', 'district', 'street', 'building')
+        ordering = ['id']
     
     def __str__(self):
         return f"{self.city}, {self.district}, {self.street}"

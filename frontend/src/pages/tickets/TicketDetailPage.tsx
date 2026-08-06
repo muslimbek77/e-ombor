@@ -2,6 +2,8 @@ import { ArrowLeft, Building2, Calendar, MapPin, MessageSquare, Pencil, Tag, Use
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTicket, useUpdateTicket } from "../../hooks/useTickets";
+import { TICKET_MANAGE_ROLES, useHasRole } from "../../lib/permissions";
+import { useAuthStore } from "../../stores/authStore";
 import { TicketForm } from "./TicketForm";
 import { formatDateTime, priorityBadgeClass, statusBadgeClass } from "./ticketUtils";
 import type { TicketUpdatePayload } from "../../types/ticket";
@@ -12,10 +14,15 @@ export default function TicketDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const { data: ticket, isPending, isError } = useTicket(ticketId);
   const updateTicket = useUpdateTicket();
+  const currentUser = useAuthStore((state) => state.user);
+  const canManageFields = useHasRole(TICKET_MANAGE_ROLES);
 
   if (!Number.isInteger(ticketId) || ticketId < 1) return <DetailState>Murojaat ID noto'g'ri.</DetailState>;
   if (isPending) return <DetailState>Yuklanmoqda...</DetailState>;
   if (isError || !ticket) return <DetailState>Murojaatni yuklashda xatolik yuz berdi.</DetailState>;
+
+  const isAuthor = ticket.created_by === currentUser?.id;
+  const canEdit = canManageFields || isAuthor;
 
   return (
     <main className="min-h-full bg-gray-50 p-6">
@@ -33,16 +40,19 @@ export default function TicketDetailPage() {
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{ticket.category_display}</span>
               </div>
             </div>
-            <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
-            </button>
+            {canEdit && (
+              <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
+              </button>
+            )}
           </div>
           {updateTicket.isError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">O'zgarishlarni saqlab bo'lmadi.</p>}
-          {isEditing ? (
+          {isEditing && canEdit ? (
             <>
               <h2 className="mb-4 text-lg font-bold text-gray-900">Murojaatni tahrirlash</h2>
               <TicketForm
                 initialTicket={ticket}
+                canManageFields={canManageFields}
                 submitLabel="Saqlash"
                 isSubmitting={updateTicket.isPending}
                 onCancel={() => setIsEditing(false)}

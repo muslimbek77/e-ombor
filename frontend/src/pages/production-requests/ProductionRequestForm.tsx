@@ -19,13 +19,15 @@ function getFormValues(request?: ProductionRequest): ProductionRequestFormValues
 
 interface ProductionRequestFormProps {
   initialRequest?: ProductionRequest;
+  /** `false` bo'lsa "Holati" maydoni ko'rsatilmaydi — muallif uni o'zgartira olmaydi. */
+  canManageStatus?: boolean;
   submitLabel?: string;
   isSubmitting?: boolean;
   onSubmit: (payload: ProductionRequestCreatePayload | ProductionRequestUpdatePayload) => void;
   onCancel: () => void;
 }
 
-export function ProductionRequestForm({ initialRequest, submitLabel = "Yaratish", isSubmitting, onSubmit, onCancel }: ProductionRequestFormProps) {
+export function ProductionRequestForm({ initialRequest, canManageStatus = true, submitLabel = "Yaratish", isSubmitting, onSubmit, onCancel }: ProductionRequestFormProps) {
   const [values, setValues] = useState<ProductionRequestFormValues>(() => getFormValues(initialRequest));
   const { data: sites = [], isPending: isSitesPending } = useSites();
 
@@ -47,7 +49,10 @@ export function ProductionRequestForm({ initialRequest, submitLabel = "Yaratish"
       return;
     }
 
-    onSubmit({ ...basePayload, status: values.status } satisfies ProductionRequestUpdatePayload);
+    onSubmit({
+      ...basePayload,
+      ...(canManageStatus ? { status: values.status } : {}),
+    } satisfies ProductionRequestUpdatePayload);
   }
 
   return (
@@ -62,7 +67,7 @@ export function ProductionRequestForm({ initialRequest, submitLabel = "Yaratish"
             {sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
           </select>
         </Field>
-        {initialRequest && (
+        {initialRequest && canManageStatus && (
           <Field label="Holati">
             <select value={values.status} onChange={(event) => updateField("status", event.target.value as ProductionRequestStatus)} className={inputClassName}>
               {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}

@@ -39,6 +39,15 @@ SITE_ROLES = {"admin", "branch_manager", "architecture"}
 # kiritadi. Xaridlarning zanjirdagi ta'siri `procurement` bosqichidagi
 # `approve`/`reject` orqali qoladi.
 DOCUMENT_MANAGE_ROLES = {"admin", "branch_manager"}
+# Zayavka holatini (`pending → approved → delivered/cancelled`) faqat shu
+# rollar o'zgartiradi. Muallif (prorab) zayavkani `pending` holatida
+# tahrirlaydi, lekin holatni o'zi o'zgartira olmaydi — aks holda o'zi
+# yozgan zayavkani o'zi tasdiqlagan bo'lardi.
+PRODUCTION_REQUEST_STATUS_ROLES = {"admin", "branch_manager", "procurement"}
+# Murojaatning `status`, `response` va `assigned_to` maydonlarini faqat shu
+# rollar o'zgartiradi — muallif faqat sarlavha/tavsif kabi mazmunini
+# tahrirlaydi, javob yozish yoki mas'ul tayinlash uning qo'lida emas.
+TICKET_MANAGE_ROLES = {"admin", "branch_manager"}
 
 
 def is_admin(user):

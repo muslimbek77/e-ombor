@@ -20,6 +20,7 @@ from ..models import (
     Warehouse,
 )
 from ..scope import branch_scope
+from ..workflow import PENDING_APPROVAL_STATUSES
 from ..serializers import (
     AuditLogSerializer,
     DocumentSerializer,
@@ -63,7 +64,7 @@ class DashboardView(APIView):
 
         stats = {
             "total_documents": documents.count(),
-            "pending_approvals": documents.filter(status__in=["architecture", "ceo"]).count(),
+            "pending_approvals": documents.filter(status__in=PENDING_APPROVAL_STATUSES).count(),
             "total_materials": Material.objects.count(),
             "total_warehouses": warehouses.count(),
             "total_sites": sites.count(),

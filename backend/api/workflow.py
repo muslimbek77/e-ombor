@@ -116,6 +116,20 @@ COMMENT_REQUIRED_ACTIONS = {
 }
 
 
+# Dashboard'dagi "tasdiqni kutayotgan hujjatlar" — qaror kutilayotgan barcha
+# holatlar: `approve` mavjud bo'lgan navbatdagi bosqichlar, va ulardan
+# `return` bilan qaytarilgan `revision`. Qo'lda sanalmagan — `WORKFLOW_RULES`
+# dan hosil bo'ladi, aks holda yangi bosqich qo'shilganda ro'yxat eskiradi.
+PENDING_APPROVAL_STATUSES = {
+    stage for stage, actions in WORKFLOW_RULES.items() if "approve" in actions
+} | {
+    config["next_status"]
+    for stage in WORKFLOW_RULES.values()
+    for action, config in stage.items()
+    if action == "return"
+}
+
+
 def is_editable(status):
     """Hujjat shu holatda tahrirlanadimi."""
     return status in EDITABLE_STATUSES

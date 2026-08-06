@@ -2,7 +2,7 @@
 
 
 from django.utils import timezone
-from rest_framework import generics, serializers
+from rest_framework import exceptions, generics, serializers
 from rest_framework.views import APIView
 
 from ..audit import create_audit_log
@@ -10,7 +10,7 @@ from ..exports import export_to_csv
 from ..models import ProductionRequest, Ticket
 from ..notifications import notify_branch_roles
 from ..numbering import next_sequence_number, save_with_unique_number
-from ..roles import is_admin
+from ..roles import PRODUCTION_REQUEST_STATUS_ROLES, TICKET_MANAGE_ROLES, has_any_role, is_admin
 from ..scope import branch_scope, filter_by_query_params
 from ..serializers import ProductionRequestSerializer, TicketSerializer
 
@@ -43,13 +43,37 @@ class ProductionRequestListView(generics.ListCreateAPIView):
 class ProductionRequestDetailView(generics.RetrieveUpdateAPIView):
     """Ishlab chiqarish zayavka tafsilotlari."""
     serializer_class = ProductionRequestSerializer
-    
+
     def get_queryset(self):
         return branch_scope(
             ProductionRequest.objects.select_related("site", "site__branch", "created_by"),
             self.request.user,
             "site__branch",
         ).order_by("-created_at")
+
+    def update(self, request, *args, **kwargs):
+        self._ensure_can_manage(self.get_object(), request)
+        return super().update(request, *args, **kwargs)
+
+    @staticmethod
+    def _ensure_can_manage(instance, request):
+        """
+        KIM va QAYSI HOLATDA — hujjat uchun ishlatilgan qolipning o'zi.
+
+        Muallif (odatda prorab) zayavkasini faqat `pending` holatida
+        tahrirlaydi, va `status` maydonini o'zi o'zgartira olmaydi — aks
+        holda o'zi yozgan zayavkani o'zi tasdiqlagan bo'lardi.
+        """
+        user = request.user
+        is_manager = has_any_role(user, PRODUCTION_REQUEST_STATUS_ROLES)
+        is_author = instance.created_by_id == user.id
+
+        if not (is_manager or is_author):
+            raise exceptions.PermissionDenied("Bu zayavkani tahrirlash uchun sizda ruxsat yo'q")
+        if "status" in request.data and not is_manager:
+            raise exceptions.PermissionDenied("Zayavka holatini o'zgartirish uchun sizda ruxsat yo'q")
+        if not is_manager and instance.status != "pending":
+            raise exceptions.PermissionDenied("Zayavka faqat 'kutilmoqda' holatida tahrirlanadi")
 
 
 # --- Ticket Views ---
@@ -58,16 +82,10 @@ class TicketListView(generics.ListCreateAPIView):
     serializer_class = TicketSerializer
     
     def get_queryset(self):
-        user = self.request.user
-        qs = Ticket.objects.select_related(
-            'created_by', 'assigned_to', 'branch', 'site'
+        qs = branch_scope(
+            Ticket.objects.select_related('created_by', 'assigned_to', 'branch', 'site'),
+            self.request.user,
         ).order_by('-created_at')
-
-        # Admin uchun ilgari shu yerda `return qs` bor edi va status/priority/
-        # category filtrlari jimgina e'tiborsiz qolardi — ro'yxat filtrlanmagan
-        # holda qaytar edi. Endi ko'rish doirasi va filtr ajratilgan.
-        if not is_admin(user):
-            qs = qs.filter(branch=user.branch) if user.branch_id else qs.filter(created_by=user)
 
         return filter_by_query_params(
             qs,
@@ -107,20 +125,35 @@ class TicketListView(generics.ListCreateAPIView):
 class TicketDetailView(generics.RetrieveUpdateAPIView):
     """Murojaat tafsilotlari."""
     serializer_class = TicketSerializer
-    
+
     def get_queryset(self):
-        user = self.request.user
-        qs = Ticket.objects.select_related(
-            'created_by', 'assigned_to', 'branch', 'site'
+        return branch_scope(
+            Ticket.objects.select_related('created_by', 'assigned_to', 'branch', 'site'),
+            self.request.user,
         ).order_by('-created_at')
-        
-        if user.is_staff or 'admin' in user.roles:
-            return qs
-        
-        if user.branch:
-            return qs.filter(branch=user.branch)
-        
-        return qs.filter(created_by=user)
+
+    def update(self, request, *args, **kwargs):
+        self._ensure_can_manage(self.get_object(), request)
+        return super().update(request, *args, **kwargs)
+
+    @staticmethod
+    def _ensure_can_manage(instance, request):
+        """
+        Muallif murojaatining mazmunini (sarlavha, tavsif va h.k.) tahrirlaydi.
+        `status`, `response` va `assigned_to` — javob berish va yo'naltirish —
+        muallifning qo'lida emas, aks holda filialdagi istalgan xodim begona
+        murojaatni o'zi "yechildi" deb yopib qo'yardi.
+        """
+        user = request.user
+        is_manager = has_any_role(user, TICKET_MANAGE_ROLES)
+        is_author = instance.created_by_id == user.id
+
+        if not (is_manager or is_author):
+            raise exceptions.PermissionDenied("Bu murojaatni tahrirlash uchun sizda ruxsat yo'q")
+        if not is_manager and set(request.data) & {"status", "response", "assigned_to"}:
+            raise exceptions.PermissionDenied(
+                "Holat, javob va mas'ul xodimni faqat administrator yoki filial rahbari o'zgartira oladi"
+            )
 
 
 class TicketsExportView(APIView):

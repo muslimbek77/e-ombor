@@ -34,6 +34,17 @@ export const SITE_ROLES: UserRole[] = ["admin", "branch_manager", "architecture"
  * va o'chirmaydi — filial rahbariga aytadi, tuzatishni u kiritadi.
  */
 export const DOCUMENT_MANAGE_ROLES: UserRole[] = ["admin", "branch_manager"];
+/**
+ * Zayavka holatini (`pending → approved → delivered/cancelled`) faqat shu
+ * rollar o'zgartiradi. Muallif zayavkani `pending` holatida tahrirlaydi,
+ * lekin holatni o'zi o'zgartira olmaydi.
+ */
+export const PRODUCTION_REQUEST_STATUS_ROLES: UserRole[] = ["admin", "branch_manager", "procurement"];
+/**
+ * Murojaatning `status`, `response` va `assigned_to` maydonlarini faqat shu
+ * rollar o'zgartiradi — muallif faqat mazmunini (sarlavha, tavsif) tahrirlaydi.
+ */
+export const TICKET_MANAGE_ROLES: UserRole[] = ["admin", "branch_manager"];
 
 /**
  * Nazorat roli. Serverda (`api/permissions.py: ControlRoleReadOnly`) unga

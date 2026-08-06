@@ -35,13 +35,15 @@ function getFormValues(ticket?: Ticket): TicketFormValues {
 
 interface TicketFormProps {
   initialTicket?: Ticket;
+  /** `false` bo'lsa holat, javob va mas'ul xodim maydonlari ko'rsatilmaydi. */
+  canManageFields?: boolean;
   submitLabel?: string;
   isSubmitting?: boolean;
   onSubmit: (payload: TicketCreatePayload | TicketUpdatePayload) => void;
   onCancel: () => void;
 }
 
-export function TicketForm({ initialTicket, submitLabel = "Yaratish", isSubmitting, onSubmit, onCancel }: TicketFormProps) {
+export function TicketForm({ initialTicket, canManageFields = true, submitLabel = "Yaratish", isSubmitting, onSubmit, onCancel }: TicketFormProps) {
   const [values, setValues] = useState<TicketFormValues>(() => getFormValues(initialTicket));
   const { data: sites = [], isPending: isSitesPending } = useSites();
   const { data: users, isPending: isUsersPending, isError: isUsersError } = useUsers();
@@ -68,9 +70,13 @@ export function TicketForm({ initialTicket, submitLabel = "Yaratish", isSubmitti
 
     onSubmit({
       ...basePayload,
-      status: values.status,
-      assigned_to: values.assigned_to ? Number(values.assigned_to) : null,
-      response: values.response,
+      ...(canManageFields
+        ? {
+            status: values.status,
+            assigned_to: values.assigned_to ? Number(values.assigned_to) : null,
+            response: values.response,
+          }
+        : {}),
     } satisfies TicketUpdatePayload);
   }
 
@@ -96,14 +102,14 @@ export function TicketForm({ initialTicket, submitLabel = "Yaratish", isSubmitti
             {sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
           </select>
         </Field>
-        {initialTicket && (
+        {initialTicket && canManageFields && (
           <Field label="Holati">
             <select value={values.status} onChange={(event) => updateField("status", event.target.value as TicketStatus)} className={inputClassName}>
               {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </Field>
         )}
-        {initialTicket && (
+        {initialTicket && canManageFields && (
           <Field label="Mas'ul xodim">
             {isUsersError ? (
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -121,7 +127,7 @@ export function TicketForm({ initialTicket, submitLabel = "Yaratish", isSubmitti
       <Field label="Tavsif">
         <textarea required rows={3} value={values.description} onChange={(event) => updateField("description", event.target.value)} className={inputClassName} />
       </Field>
-      {initialTicket && (
+      {initialTicket && canManageFields && (
         <Field label="Javob">
           <textarea rows={2} value={values.response} onChange={(event) => updateField("response", event.target.value)} className={inputClassName} placeholder="Murojaatga javob yozing..." />
         </Field>

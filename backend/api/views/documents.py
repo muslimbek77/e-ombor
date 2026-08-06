@@ -127,6 +127,7 @@ class DocumentWorkflowActionView(APIView):
             )
 
         previous_status = document.status
+        previous_status_label = document.get_status_display()
         next_status = rule["next_status"]
 
         try:
@@ -189,7 +190,7 @@ class DocumentWorkflowActionView(APIView):
                 "admin",
             },
             "Hujjat holati yangilandi",
-            f"{document.doc_number} hujjati {previous_status} dan {document.status} ga o'tdi.",
+            f"{document.doc_number} hujjati {previous_status_label} dan {document.get_status_display()} ga o'tdi.",
             "info" if document.status != "rejected" else "warning",
         )
         if recipients:

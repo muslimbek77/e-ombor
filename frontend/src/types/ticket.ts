@@ -33,10 +33,15 @@ export interface TicketCreatePayload {
   site: number | null;
 }
 
+/**
+ * `status`, `assigned_to` va `response` — faqat `TICKET_MANAGE_ROLES`
+ * (backend: `roles.py: TICKET_MANAGE_ROLES`). Muallif ularni yubormaydi,
+ * aks holda server 403 qaytaradi.
+ */
 export interface TicketUpdatePayload extends TicketCreatePayload {
-  status: TicketStatus;
-  assigned_to: number | null;
-  response: string;
+  status?: TicketStatus;
+  assigned_to?: number | null;
+  response?: string;
 }
 
 export interface TicketsResponse {

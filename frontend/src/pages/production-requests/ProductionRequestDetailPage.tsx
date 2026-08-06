@@ -2,6 +2,8 @@ import { ArrowLeft, Calendar, ClipboardList, Hash, MapPin, Pencil, RefreshCw, Us
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useProductionRequest, useUpdateProductionRequest, useUpdateProductionRequestStatus } from "../../hooks/useProductionRequests";
+import { PRODUCTION_REQUEST_STATUS_ROLES, useHasRole } from "../../lib/permissions";
+import { useAuthStore } from "../../stores/authStore";
 import { ProductionRequestForm } from "./ProductionRequestForm";
 import { formatDateTime, nextStatuses, statusBadgeClass } from "./productionRequestUtils";
 import type { ProductionRequest, ProductionRequestUpdatePayload } from "../../types/productionRequest";
@@ -13,12 +15,16 @@ export default function ProductionRequestDetailPage() {
   const { data: request, isPending, isError } = useProductionRequest(requestId);
   const updateRequest = useUpdateProductionRequest();
   const updateStatus = useUpdateProductionRequestStatus();
+  const currentUser = useAuthStore((state) => state.user);
+  const canManageStatus = useHasRole(PRODUCTION_REQUEST_STATUS_ROLES);
 
   if (!Number.isInteger(requestId) || requestId < 1) return <DetailState>Zayavka ID noto'g'ri.</DetailState>;
   if (isPending) return <DetailState>Yuklanmoqda...</DetailState>;
   if (isError || !request) return <DetailState>Zayavkani yuklashda xatolik yuz berdi.</DetailState>;
 
-  const transitions = nextStatuses(request.status);
+  const isAuthor = request.created_by === currentUser?.id;
+  const canEdit = canManageStatus || (isAuthor && request.status === "pending");
+  const transitions = canManageStatus ? nextStatuses(request.status) : [];
 
   return (
     <main className="min-h-full bg-gray-50 p-6">
@@ -35,16 +41,19 @@ export default function ProductionRequestDetailPage() {
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{request.request_number}</span>
               </div>
             </div>
-            <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
-            </button>
+            {canEdit && (
+              <button type="button" onClick={() => setIsEditing((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                <Pencil size={15} /> {isEditing ? "Bekor qilish" : "Tahrirlash"}
+              </button>
+            )}
           </div>
           {(updateRequest.isError || updateStatus.isError) && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">O'zgarishlarni saqlab bo'lmadi.</p>}
-          {isEditing ? (
+          {isEditing && canEdit ? (
             <>
               <h2 className="mb-4 text-lg font-bold text-gray-900">Zayavkani tahrirlash</h2>
               <ProductionRequestForm
                 initialRequest={request}
+                canManageStatus={canManageStatus}
                 submitLabel="Saqlash"
                 isSubmitting={updateRequest.isPending}
                 onCancel={() => setIsEditing(false)}
@@ -56,7 +65,7 @@ export default function ProductionRequestDetailPage() {
           )}
         </section>
 
-        {!isEditing && (
+        {!isEditing && canManageStatus && (
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="mb-1 flex items-center gap-2 text-lg font-bold text-gray-900"><RefreshCw size={17} className="text-gray-400" /> Holat o'zgarishi</h2>
             <p className="mb-4 text-sm text-gray-500">

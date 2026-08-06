@@ -3,7 +3,7 @@
 Bu hujjat platformaning ishlash mantiqini bir joyda bayon qiladi: kim nima
 qila oladi, hujjat qanday yo'ldan o'tadi, ma'lumot qanday chegaralanadi va
 nima tekshirilgan. Har bir da'vo `backend/api/tests_*.py` dagi testlar bilan qo'llab-quvvatlangan
-(jami 143 ta test).
+(jami 156 ta test).
 
 ---
 
@@ -150,10 +150,23 @@ bo'lib `True` qaytaradi, ya'ni admin hamma katakda ✅.
 | Hujjat yaratish | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Hujjatni tahrirlash/o'chirish | muallif | muallif | muallif | muallif | muallif | muallif | ✅ |
 | Hujjatni arxivlash | — | — | ✅ | — | — | — | ✅ |
-| Zayavka va murojaat | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Zayavka: mazmun (muallif, `pending`da) | — | — | — | — | — | muallif | — |
+| Zayavka: holat (`pending→approved→...`) | — | — | ✅ | — | — | — | ✅ |
+| Murojaat: mazmun (muallif) | — | — | — | — | — | muallif | — |
+| Murojaat: holat/javob/mas'ul xodim | — | — | — | — | — | — | ✅ |
 | Foydalanuvchilar | — | — | — | — | — | — | — |
 
 *"muallif" — faqat o'zi yaratgan hujjatni; begonasini emas.*
+
+Zayavka va murojaat hujjat bilan bir xil qolipdan foydalanadi (KIM va QAYSI
+HOLATDA alohida tekshiriladi, `views/tickets.py`): muallif zayavkasini faqat
+`pending` holatida tahrirlaydi, holatni esa hech qachon o'zi o'zgartira
+olmaydi — `PRODUCTION_REQUEST_STATUS_ROLES` (admin, filial rahbari, xaridlar)
+buni qiladi. Murojaatda muallif sarlavha/tavsif kabi mazmunni tahrirlaydi,
+`status`, `response` va `assigned_to` esa `TICKET_MANAGE_ROLES` (admin,
+filial rahbari) qo'lida — aks holda filialdagi istalgan xodim begona
+murojaatni "yechildi" deb yopib qo'yardi. Admin ikkalasida ham istisno emas,
+`has_any_role()` orqali baribir ishlaydi.
 
 ### Nazorat roli — faqat o'qiydi
 
@@ -253,8 +266,10 @@ id ni taxmin qilib begona filial yozuviga kirib bo'lmaydi (404 qaytadi).
 Bu hujjat, ombor, obyekt, zaxira, shartnoma, hisob-faktura, to'lov, zayavka
 va fayl yuklashga tegishli.
 
-Murojaatlar (`Ticket`) biroz boshqacha: filiali bor xodim butun filial
-murojaatlarini, filialsiz esa faqat o'zi yaratganini ko'radi.
+Murojaatlar (`Ticket`) va zayavkalar (`ProductionRequest`) ham xuddi shu
+`branch_scope()` dan o'tadi — ilgari `Ticket` ro'yxati o'z filtrini yozardi
+va filialsiz hisobga o'zi yaratgan murojaatlarni ko'rsatardi, bu esa boshqa
+har bir joydagi qoidadan (filialsiz = bo'sh ro'yxat) farq qilardi.
 
 ---
 
@@ -552,6 +567,8 @@ python manage.py test api
 | `tests_document_freeze.py` | Muzlatish va `PurchaseOrder` qatorlari (8 test) |
 | `tests_document_comments.py` | Hujjatga bog'langan yozishma (10 test) |
 | `tests_notifications.py` | Bildirishnoma faqat egasiga ko'rinishi (3 test) |
+| `tests_tickets.py` | Zayavka va murojaat — muallif/rol tekshiruvi (12 test) |
+| `tests_dashboard.py` | `pending_approvals` zanjirdan hosil bo'lishi (1 test) |
 
 Har bir tekshiruv **kutilgan** xulqni tasdiqlaydi. Umumiy tayyorgarlik
 (`BaseAPITestCase`, ikkita filial, har rol uchun foydalanuvchi) —

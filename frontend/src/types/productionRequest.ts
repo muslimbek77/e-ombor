@@ -21,8 +21,13 @@ export interface ProductionRequestCreatePayload {
   description: string;
 }
 
+/**
+ * `status` — faqat `PRODUCTION_REQUEST_STATUS_ROLES`
+ * (backend: `roles.py: PRODUCTION_REQUEST_STATUS_ROLES`). Muallif uni
+ * yubormaydi, aks holda server 403 qaytaradi.
+ */
 export interface ProductionRequestUpdatePayload extends ProductionRequestCreatePayload {
-  status: ProductionRequestStatus;
+  status?: ProductionRequestStatus;
 }
 
 export interface ProductionRequestsResponse {

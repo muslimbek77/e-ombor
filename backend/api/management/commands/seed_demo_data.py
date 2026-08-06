@@ -177,6 +177,28 @@ class Command(BaseCommand):
                 "branch": branch_main,
             },
             {
+                # Filialda omborchi bo'lmasa hujjat `delivering` da qotib
+                # qoladi — qabul qiladigan hech kim yo'q.
+                "email": "warehouse.samarqand@eombor.uz",
+                "password": "Warehouse123!",
+                "first_name": "Nodira",
+                "last_name": "Yusupova",
+                "phone": "+998901111121",
+                "stir_inn": "123456789022",
+                "roles": ["warehouse"],
+                "branch": branch_secondary,
+            },
+            {
+                "email": "warehouse.fargona@eombor.uz",
+                "password": "Warehouse123!",
+                "first_name": "Otabek",
+                "last_name": "Yoldoshev",
+                "phone": "+998901111122",
+                "stir_inn": "123456789023",
+                "roles": ["warehouse"],
+                "branch": branch_third,
+            },
+            {
                 "email": "prorab@eombor.uz",
                 "password": "Prorab123!",
                 "first_name": "Bekzod",
