@@ -11,6 +11,7 @@ interface User {
   stir_inn: string;
   roles: string[];
   branch: number | null;
+  branch_name: string | null;
   is_active: boolean;
   is_staff: boolean;
   last_login: string;
