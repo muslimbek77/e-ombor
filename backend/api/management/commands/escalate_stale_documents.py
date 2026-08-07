@@ -56,6 +56,8 @@ class Command(BaseCommand):
                     f"holatida {options['days']} kundan ortiq harakatsiz qolmoqda."
                 ),
                 "warning",
+                related_type="document",
+                related_id=document.id,
             )
             count += 1
 
