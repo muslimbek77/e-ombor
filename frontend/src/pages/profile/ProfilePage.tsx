@@ -4,6 +4,7 @@ import { isAxiosError } from "axios";
 import { useAuthStore } from "../../stores/authStore";
 import { useChangePassword } from "../../hooks/auth/useChangePassword";
 import { useLogout } from "../../hooks/auth/useLogout";
+import { roleLabel } from "../users/usersUtils";
 import {
   User,
   Mail,
@@ -391,7 +392,7 @@ const ProfilePage = () => {
                         className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: "#eff6ff", color: "#1d4ed8" }}
                       >
-                        {user.roles.join(", ")}
+                        {user.roles.map(roleLabel).join(", ")}
                       </span>
                     )}
                   </div>
@@ -461,7 +462,7 @@ const ProfilePage = () => {
             <Field
               icon={<Building2 size={15} />}
               label="Filial"
-              value={user.branch ?? undefined}
+              value={user.branch_name || undefined}
               empty="Biriktirilmagan"
             />
             <Field

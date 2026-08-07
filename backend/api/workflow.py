@@ -130,6 +130,13 @@ PENDING_APPROVAL_STATUSES = {
 }
 
 
+# Kimningdir qarorini kutayotgan holatlar — muallif emas, boshqa rol
+# navbatda. `WORKFLOW_RULES` dagi barcha bosqichlar, `EDITABLE_STATUSES`dan
+# tashqari (ular muallif tarafida). Uzoq kutgan hujjatlarni topish uchun
+# ishlatiladi (`management/commands/escalate_stale_documents.py`).
+WAITING_STATUSES = set(WORKFLOW_RULES) - EDITABLE_STATUSES
+
+
 def is_editable(status):
     """Hujjat shu holatda tahrirlanadimi."""
     return status in EDITABLE_STATUSES

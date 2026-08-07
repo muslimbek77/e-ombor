@@ -1,14 +1,16 @@
-import { Archive, ArrowLeft, Building2, Calendar, FileText, Hash, MapPin, MessageSquare, Paperclip, Pencil, Send, Upload, Wallet } from "lucide-react";
-import { useRef, useState } from "react";
+import { Archive, ArrowLeft, Building2, Calendar, CheckCheck, Clock, FileText, Hash, History, MapPin, MessageSquare, Paperclip, Pencil, Send, Upload, Wallet } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useCreateDocumentComment, useDocument, useDocumentComments, useToggleArchive, useUpdateDocument, useWorkflowAction } from "../../hooks/useDocuments";
 import { useDocumentFiles, useUploadDocumentFile } from "../../hooks/useDocuments";
 import { useWarehouses } from "../../hooks/useWarehouses";
 import { DocumentForm } from "./DocumentForm";
-import { actionLabel, docTypeLabel, formatFileSize, isDocumentEditable, requiresComment, statusBadgeClass } from "./documentUtils";
+import { actionLabel, activityCardClass, activityDetailClass, activityIconClass, activityTitleClass, daysSince, docTypeLabel, formatFileSize, isDocumentEditable, isWaitingStatus, requiresComment, statusBadgeClass, waitingBadgeClass, waitingLabel } from "./documentUtils";
 import { formatDateTime } from "../tickets/ticketUtils";
 import { formatBudget, formatDate } from "../objects/siteUtils";
-import { useIsControlRole } from "../../lib/permissions";
+import { DOCUMENT_MANAGE_ROLES, useHasRole, useIsControlRole } from "../../lib/permissions";
+import { useAuthStore } from "../../stores/authStore";
+import { roleLabel } from "../users/usersUtils";
 import type { DocumentUpdatePayload, WorkflowAction } from "../../types/document";
 
 export default function DocumentDetailPage() {
@@ -32,14 +34,57 @@ export default function DocumentDetailPage() {
   const createComment = useCreateDocumentComment();
   const { data: warehouses = [] } = useWarehouses();
   const isReadOnly = useIsControlRole();
+  const currentUser = useAuthStore((state) => state.user);
+  const canManageDocuments = useHasRole(DOCUMENT_MANAGE_ROLES);
+
+  // Uch bo'lakka bo'lingan tarixni (tasdiqlash / izoh / fayl) bitta ko'zdan
+  // kechirish uchun xronologik lentaga birlashtiradi — pastdagi batafsil
+  // bo'limlar shu manbalarning o'zidan, faqat qayta guruhlangan.
+  const activity = useMemo(() => {
+    const approvalEntries = (document?.approvals ?? []).map((approval) => ({
+      key: `approval-${approval.id}`,
+      time: approval.created_at,
+      icon: <CheckCheck size={14} />,
+      title: `${actionLabel(approval.action as WorkflowAction)} — ${approval.approver_name || "—"}`,
+      subtitle: approval.approver_roles?.length > 0 ? approval.approver_roles.map(roleLabel).join(", ") : undefined,
+      detail: approval.comment,
+      action: approval.action as WorkflowAction,
+    }));
+    const commentEntries = comments.map((comment) => ({
+      key: `comment-${comment.id}`,
+      time: comment.created_at,
+      icon: <MessageSquare size={14} />,
+      title: `Izoh — ${comment.author_name || "—"}`,
+      subtitle: undefined as string | undefined,
+      detail: comment.text,
+      action: undefined as WorkflowAction | undefined,
+    }));
+    const fileEntries = files.map((file) => ({
+      key: `file-${file.id}`,
+      time: file.created_at,
+      icon: <Paperclip size={14} />,
+      title: `Fayl yuklandi — ${file.uploaded_by_name || "—"}`,
+      subtitle: undefined as string | undefined,
+      detail: file.original_filename,
+      action: undefined as WorkflowAction | undefined,
+    }));
+    return [...approvalEntries, ...commentEntries, ...fileEntries].sort(
+      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
+    );
+  }, [document?.approvals, comments, files]);
 
   if (!Number.isInteger(documentId) || documentId < 1) return <DetailState>Hujjat ID noto'g'ri.</DetailState>;
   if (isPending) return <DetailState>Yuklanmoqda...</DetailState>;
   if (isError || !document) return <DetailState>Hujjatni yuklashda xatolik yuz berdi.</DetailState>;
 
   // Zanjirga kirgan hujjat muzlaydi (server: 409), nazorat roli esa umuman
-  // yozmaydi (server: 403). Ikkalasida ham tugmani ko'rsatishning ma'nosi yo'q.
-  const canEdit = !isReadOnly && isDocumentEditable(document.status);
+  // yozmaydi (server: 403). Muallif yoki DOCUMENT_MANAGE_ROLES bo'lmasa ham
+  // yo'q (server: 403) — server tekshiruvi bilan bir xil (`documents.py:
+  // _ensure_can_manage`), aks holda bosilganda 403 beradigan tugma ko'rinardi.
+  const canEdit =
+    !isReadOnly &&
+    isDocumentEditable(document.status) &&
+    (document.created_by === currentUser?.id || canManageDocuments);
   // Qabulda xarid qatorlari omborga kirim bo'ladi va ombor taxmin qilinmaydi —
   // filialda bittasi bo'lsa ham omborchi o'zi ko'rsatadi (server: 400).
   // Qatorlari yo'q hujjatda ombor kerak emas, lekin buni bu yerdan bilib
@@ -109,6 +154,7 @@ export default function DocumentDetailPage() {
                 <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(document.status)}`}>{document.status_display}</span>
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">{docTypeLabel(document.doc_type)}</span>
                 {document.is_archived && <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500"><Archive size={11} /> Arxivlangan</span>}
+                {isWaitingStatus(document.status) && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${waitingBadgeClass(daysSince(document.updated_at))}`}><Clock size={11} /> {waitingLabel(daysSince(document.updated_at))}</span>}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -178,6 +224,11 @@ export default function DocumentDetailPage() {
                   <label className={`block text-xs font-semibold ${pendingAction === "reject" ? "text-red-700" : "text-yellow-800"}`}>
                     {pendingAction === "reject" ? "Rad etish sababi (majburiy)" : "Nima tuzatilishi kerak (majburiy)"}
                   </label>
+                  {pendingAction === "return" && (
+                    <p className="text-xs text-yellow-700">
+                      Diqqat: hujjat tuzatishga qaytariladi va qayta yuborilganda zanjir arxitekturadan boshdan boshlanadi — hozirgacha berilgan barcha tasdiqlar qayta so'raladi.
+                    </p>
+                  )}
                   <textarea rows={2} value={comment} onChange={(event) => setComment(event.target.value)} className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-gray-900 outline-none ${pendingAction === "reject" ? "border-red-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-yellow-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20"}`} />
                   <div className="flex justify-end gap-2">
                     <button type="button" onClick={resetActionPanel} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-100">Bekor qilish</button>
@@ -207,17 +258,21 @@ export default function DocumentDetailPage() {
           )}
         </section>
 
-        {document.approvals.length > 0 && (
+        {activity.length > 0 && (
           <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-bold text-gray-900">Tasdiqlashlar tarixi</h2>
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900"><History size={18} className="text-gray-400" /> Faoliyat tarixi</h2>
             <div className="space-y-3">
-              {document.approvals.map((approval) => (
-                <div key={approval.id} className="flex flex-wrap items-start justify-between gap-3 rounded-xl bg-gray-50 p-4">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{actionLabel(approval.action as WorkflowAction)} — {approval.approver_name || "—"}</p>
-                    {approval.comment && <p className="mt-1 text-xs text-gray-500">{approval.comment}</p>}
+              {activity.map((entry) => (
+                <div key={entry.key} className={`flex items-start gap-3 rounded-xl border p-4 ${activityCardClass(entry.action)}`}>
+                  <span className={`mt-0.5 shrink-0 ${activityIconClass(entry.action)}`}>{entry.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <p className={`text-sm font-semibold ${activityTitleClass(entry.action)}`}>{entry.title}</p>
+                      <p className="shrink-0 text-xs text-gray-400">{formatDateTime(entry.time)}</p>
+                    </div>
+                    {entry.subtitle && <p className="mt-0.5 text-xs text-gray-400">{entry.subtitle}</p>}
+                    {entry.detail && <p className={`mt-1.5 whitespace-pre-line ${activityDetailClass(entry.action)}`}>{entry.detail}</p>}
                   </div>
-                  <p className="text-xs text-gray-400">{formatDateTime(approval.created_at)}</p>
                 </div>
               ))}
             </div>

@@ -139,10 +139,11 @@ class DocumentApprovalSerializer(serializers.ModelSerializer):
     """Hujjat bo'yicha tasdiqlashlar tarixi."""
 
     approver_name = serializers.CharField(source="approver.full_name", read_only=True)
+    approver_roles = serializers.ListField(source="approver.roles", read_only=True, default=list)
 
     class Meta:
         model = DocumentApproval
-        fields = ["id", "action", "comment", "created_at", "approver", "approver_name"]
+        fields = ["id", "action", "comment", "created_at", "approver", "approver_name", "approver_roles"]
         read_only_fields = fields
 
 

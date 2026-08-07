@@ -3,7 +3,7 @@
 Bu hujjat platformaning ishlash mantiqini bir joyda bayon qiladi: kim nima
 qila oladi, hujjat qanday yo'ldan o'tadi, ma'lumot qanday chegaralanadi va
 nima tekshirilgan. Har bir da'vo `backend/api/tests_*.py` dagi testlar bilan qo'llab-quvvatlangan
-(jami 156 ta test).
+(jami 159 ta test).
 
 ---
 
@@ -537,17 +537,29 @@ filtrlarini qabul qiladi.
 
 ## 11. Ma'lumot hayoti va test
 
-Ikkita boshqaruv komandasi:
+Uchta boshqaruv komandasi:
 
 ```bash
 python manage.py seed_demo_data     # to'liq demo to'plam + demo loginlar
 python manage.py flush_demo_data    # tranzaksion va ma'lumotnoma yozuvlarini o'chiradi
 python manage.py flush_demo_data --dry-run   # nima o'chishini ko'rsatadi
+python manage.py escalate_stale_documents            # standart: 3+ kun harakatsiz hujjatlarga eslatma
+python manage.py escalate_stale_documents --days 5   # muddatni o'zgartirish
 ```
 
 `flush_demo_data` **foydalanuvchilar, ularning rollari va filiallarni
 saqlaydi** — filial `User.branch` uchun zarur, u o'chsa xodimlar filialsiz
 qolib, hech narsa ko'rmay qoladi.
+
+`escalate_stale_documents` `workflow.py: WAITING_STATUSES` (kimningdir qarorini
+kutayotgan holatlar — `EDITABLE_STATUSES`dan tashqari hammasi) bo'yicha
+`updated_at` belgilangan muddatdan eski hujjatlarni topib, o'sha bosqichda
+harakat qila oladigan rollarga (+ `branch_manager`/`admin`) ogohlantirish
+yuboradi. O'zi hech narsani rejalashtirmaydi — muntazam ishlashi uchun tashqi
+kron kerak (loyihada hozircha Celery yo'q). Frontendda shu g'oyaning ko'zga
+ko'rinadigan tarafi bor: hujjat kartasi va tafsilot sahifasida "N kundan beri
+kutmoqda" belgisi (`frontend/src/pages/documents/documentUtils.ts:
+WAITING_STATUSES`, backenddagi ro'yxatning qo'lda saqlanadigan nusxasi).
 
 Testlar:
 
@@ -569,6 +581,7 @@ python manage.py test api
 | `tests_notifications.py` | Bildirishnoma faqat egasiga ko'rinishi (3 test) |
 | `tests_tickets.py` | Zayavka va murojaat — muallif/rol tekshiruvi (12 test) |
 | `tests_dashboard.py` | `pending_approvals` zanjirdan hosil bo'lishi (1 test) |
+| `tests_stale_documents.py` | `escalate_stale_documents` — uzoq kutgan hujjatlarga eslatma (3 test) |
 
 Har bir tekshiruv **kutilgan** xulqni tasdiqlaydi. Umumiy tayyorgarlik
 (`BaseAPITestCase`, ikkita filial, har rol uchun foydalanuvchi) —

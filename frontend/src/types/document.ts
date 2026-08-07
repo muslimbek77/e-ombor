@@ -23,6 +23,7 @@ export interface DocumentApproval {
   created_at: string;
   approver: number | null;
   approver_name: string;
+  approver_roles: string[];
 }
 
 export interface AppDocument {

@@ -14,7 +14,7 @@ kod izohlari o'zbekcha.
 ```bash
 # Backend
 cd backend && source venv/bin/activate
-python manage.py test api          # 143 test — o'zgarishdan keyin shu yuritiladi
+python manage.py test api          # 159 test — o'zgarishdan keyin shu yuritiladi
 python manage.py migrate
 python manage.py seed_demo_data    # demo to'plam + demo loginlar
 python manage.py runserver 0.0.0.0:3000
