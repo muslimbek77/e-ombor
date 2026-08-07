@@ -156,4 +156,6 @@ class PaymentCreateView(generics.CreateAPIView):
             "Invoice bo'yicha to'lov qayd etildi",
             f"{invoice.invoice_number} uchun {payment.amount} summa to'landi.",
             "success",
+            related_type="invoice",
+            related_id=invoice.id,
         )

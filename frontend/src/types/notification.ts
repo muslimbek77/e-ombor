@@ -4,6 +4,8 @@ export interface Notification {
   message: string;
   is_read: boolean;
   notification_type: string;
+  related_type: string | null;
+  related_id: number | null;
   created_at: string;
 }
 

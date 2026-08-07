@@ -89,6 +89,8 @@ class DocumentListCreateView(generics.ListCreateAPIView):
             "Yangi hujjat yaratildi",
             f"{document.doc_number} raqamli hujjat yaratildi va ko'rib chiqishni kutmoqda.",
             "info",
+            related_type="document",
+            related_id=document.id,
         )
 
 
@@ -192,6 +194,8 @@ class DocumentWorkflowActionView(APIView):
             "Hujjat holati yangilandi",
             f"{document.doc_number} hujjati {previous_status_label} dan {document.get_status_display()} ga o'tdi.",
             "info" if document.status != "rejected" else "warning",
+            related_type="document",
+            related_id=document.id,
         )
         if recipients:
             notify_users(
@@ -199,6 +203,8 @@ class DocumentWorkflowActionView(APIView):
                 "Hujjat holati yangilandi",
                 f"{document.doc_number} hujjatingizning yangi holati: {document.get_status_display()}",
                 "info" if document.status != "rejected" else "warning",
+                related_type="document",
+                related_id=document.id,
             )
 
         return Response(DocumentSerializer(document, context={"request": request}).data, status=status.HTTP_200_OK)
@@ -228,6 +234,8 @@ class DocumentWorkflowActionView(APIView):
             "Qaytarilgan hujjat qayta yuborildi",
             f"{document.doc_number} hujjati tuzatilib qayta jo'natildi — zanjir arxitekturadan boshlanadi.",
             "info",
+            related_type="document",
+            related_id=document.id,
         )
 
 
@@ -410,6 +418,8 @@ class DocumentCommentListCreateView(generics.ListCreateAPIView):
             "Hujjatga yangi izoh",
             f"{document.doc_number} hujjatiga izoh yozildi: {comment.text[:120]}",
             "info",
+            related_type="document",
+            related_id=document.id,
         )
         if document.created_by_id and document.created_by_id != self.request.user.id:
             notify_users(
@@ -417,6 +427,8 @@ class DocumentCommentListCreateView(generics.ListCreateAPIView):
                 "Hujjatingizga izoh yozildi",
                 f"{document.doc_number}: {comment.text[:120]}",
                 "info",
+                related_type="document",
+                related_id=document.id,
             )
 
 

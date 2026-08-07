@@ -12,7 +12,7 @@ from .models import Notification, User
 from .roles import GLOBAL_SCOPE_ROLES, is_admin
 
 
-def notify_users(users, title, message, notification_type="info"):
+def notify_users(users, title, message, notification_type="info", related_type=None, related_id=None):
     unique_users = []
     seen_ids = set()
     for user in users:
@@ -27,13 +27,15 @@ def notify_users(users, title, message, notification_type="info"):
                 title=title,
                 message=message,
                 notification_type=notification_type,
+                related_type=related_type,
+                related_id=related_id,
             )
             for user in unique_users
         ]
     )
 
 
-def notify_branch_roles(branch, roles, title, message, notification_type="info"):
+def notify_branch_roles(branch, roles, title, message, notification_type="info", related_type=None, related_id=None):
     """
     Filialdagi tegishli rollarga xabar yuboradi.
 
@@ -59,7 +61,7 @@ def notify_branch_roles(branch, roles, title, message, notification_type="info")
         )
     ]
     if filtered:
-        notify_users(filtered, title, message, notification_type)
+        notify_users(filtered, title, message, notification_type, related_type, related_id)
 
 
 def create_low_stock_notifications(item):
@@ -69,4 +71,12 @@ def create_low_stock_notifications(item):
 
     title = "Kam zaxira ogohlantirishi"
     message = f"{item.material.name} materiali {item.warehouse.name} omborida minimal chegaraga tushdi."
-    notify_branch_roles(item.warehouse.branch, {"warehouse", "branch_manager", "admin"}, title, message, "warning")
+    notify_branch_roles(
+        item.warehouse.branch,
+        {"warehouse", "branch_manager", "admin"},
+        title,
+        message,
+        "warning",
+        related_type="inventory",
+        related_id=item.id,
+    )

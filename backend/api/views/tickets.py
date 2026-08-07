@@ -119,6 +119,8 @@ class TicketListView(generics.ListCreateAPIView):
             "Yangi murojaat yaratildi",
             f"{ticket.title} nomli murojaat yaratildi.",
             "info",
+            related_type="ticket",
+            related_id=ticket.id,
         )
 
 

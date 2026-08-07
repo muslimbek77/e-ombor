@@ -381,8 +381,14 @@ class Notification(models.Model):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     notification_type = models.CharField(max_length=50, default='info')
+    # Bosilganda qaysi sahifaga o'tish kerakligini bildiradi — frontend
+    # `related_type` ni marshrut prefiksiga (masalan "document" -> /documents)
+    # xaritalaydi. Ikkalasi ham bo'sh bo'lishi mumkin (masalan xush kelibsiz
+    # xabari hech qayerga olib bormaydi).
+    related_type = models.CharField(max_length=50, null=True, blank=True)
+    related_id = models.IntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'notifications'
         ordering = ['-created_at']
