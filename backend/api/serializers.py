@@ -27,10 +27,17 @@ from .models import (
     Warehouse,
 )
 
-from .workflow import CONTROL_ROLE, ROLES_CONFLICTING_WITH_CONTROL, allowed_actions_for
+from .workflow import (
+    CONTROL_ROLE,
+    ROLES_CONFLICTING_WITH_CONTROL,
+    allowed_actions_for,
+    send_back_targets_for,
+)
 
 User = get_user_model()
 ARCHIVE_VISIBLE_ROLES = {"admin", "procurement", "branch_manager"}
+# Holat kodi → o'zbekcha nomi. Qo'lda yozilmaydi: manba `Document.STATUSES`.
+STATUS_LABELS = dict(Document.STATUSES)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -140,11 +147,25 @@ class DocumentApprovalSerializer(serializers.ModelSerializer):
 
     approver_name = serializers.CharField(source="approver.full_name", read_only=True)
     approver_roles = serializers.ListField(source="approver.roles", read_only=True, default=list)
+    target_status_display = serializers.SerializerMethodField()
 
     class Meta:
         model = DocumentApproval
-        fields = ["id", "action", "comment", "created_at", "approver", "approver_name", "approver_roles"]
+        fields = [
+            "id",
+            "action",
+            "comment",
+            "created_at",
+            "approver",
+            "approver_name",
+            "approver_roles",
+            "target_status",
+            "target_status_display",
+        ]
         read_only_fields = fields
+
+    def get_target_status_display(self, obj):
+        return STATUS_LABELS.get(obj.target_status, "")
 
 
 class DocumentCommentSerializer(serializers.ModelSerializer):
@@ -179,6 +200,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source="branch.name", read_only=True)
     approvals = DocumentApprovalSerializer(many=True, read_only=True)
     allowed_actions = serializers.SerializerMethodField()
+    send_back_targets = serializers.SerializerMethodField()
     can_archive = serializers.SerializerMethodField()
 
     class Meta:
@@ -205,6 +227,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "updated_at",
             "approvals",
             "allowed_actions",
+            "send_back_targets",
             "can_archive",
         ]
         read_only_fields = [
@@ -217,6 +240,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "branch_name",
             "approvals",
             "allowed_actions",
+            "send_back_targets",
             "archived_at",
             "can_archive",
         ]
@@ -228,6 +252,20 @@ class DocumentSerializer(serializers.ModelSerializer):
 
         user = request.user
         return allowed_actions_for(obj.status, user.roles, is_staff=user.is_staff)
+
+    def get_send_back_targets(self, obj):
+        """
+        `send_back` da tanlanadigan bosqichlar — nomi bilan birga.
+
+        Ro'yxatni frontend o'zi tuzsa `permissions.ts` dagi kabi yana bir nusxa
+        paydo bo'lardi va zanjir tartibi o'zgarganda jimgina eskirardi.
+        Ruxsat bu yerda tekshirilmaydi: amalning o'zi `allowed_actions` da
+        ko'rinadi, bu esa faqat unga hamroh ro'yxat.
+        """
+        return [
+            {"value": target, "label": STATUS_LABELS.get(target, target)}
+            for target in send_back_targets_for(obj.status)
+        ]
 
     def get_can_archive(self, obj):
         request = self.context.get("request")
@@ -248,10 +286,15 @@ class DocumentWorkflowSerializer(serializers.Serializer):
             "close",
             "reject",
             "return",
+            "send_back",
             "reopen",
         ]
     )
     comment = serializers.CharField(required=False, allow_blank=True)
+    # Faqat `send_back` uchun: qaysi oldingi bosqichga qaytariladi. Ro'yxat
+    # bosqichga bog'liq, shuning uchun bu yerda `ChoiceField` emas — haqiqiy
+    # tekshiruv view'da `WORKFLOW_RULES[...]["send_back"]["targets"]` bo'yicha.
+    target_status = serializers.CharField(required=False, allow_blank=True)
     # Faqat `advance` (yetkazilmoqda → qabul qilindi) uchun: xarid qatorlari
     # qaysi omborga kirim bo'ladi. Filialda bitta ombor bo'lsa u o'zi topiladi.
     warehouse = serializers.PrimaryKeyRelatedField(

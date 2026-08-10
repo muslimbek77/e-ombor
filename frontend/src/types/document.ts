@@ -14,7 +14,7 @@ export type DocStatus =
   | "closed"
   | "rejected";
 
-export type WorkflowAction = "submit" | "approve" | "advance" | "close" | "reject" | "return" | "reopen";
+export type WorkflowAction = "submit" | "approve" | "advance" | "close" | "reject" | "return" | "send_back" | "reopen";
 
 export interface DocumentApproval {
   id: number;
@@ -24,6 +24,15 @@ export interface DocumentApproval {
   approver: number | null;
   approver_name: string;
   approver_roles: string[];
+  /** Faqat `send_back` da to'ladi: qaysi bosqichga qaytarilgani. */
+  target_status: string;
+  target_status_display: string;
+}
+
+/** `send_back` da tanlanadigan bosqich — ro'yxatni server beradi. */
+export interface SendBackTarget {
+  value: DocStatus;
+  label: string;
 }
 
 export interface AppDocument {
@@ -48,6 +57,7 @@ export interface AppDocument {
   updated_at: string;
   approvals: DocumentApproval[];
   allowed_actions: WorkflowAction[];
+  send_back_targets: SendBackTarget[];
   can_archive: boolean;
 }
 
@@ -99,6 +109,8 @@ export interface WorkflowActionPayload {
   comment?: string;
   /** Faqat `advance` uchun: xarid qatorlari qaysi omborga kirim bo'ladi. */
   warehouse?: number;
+  /** Faqat `send_back` uchun: qaysi oldingi bosqichga qaytariladi. */
+  target_status?: DocStatus;
 }
 
 export interface DocumentComment {

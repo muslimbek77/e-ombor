@@ -20,6 +20,22 @@ holatga tushiradi, lekin `return` dan keyin zanjir arxitekturadan qaytadan
 boshlanadi — summa yoki qatorlar o'zgargan bo'lsa oldingi tasdiqlar boshqa
 hujjatga tegishli bo'lib qoladi, muzlatish aynan shuning uchun kiritilgan.
 
+Uchinchi amal — `send_back` ("bosqichga qaytarish"). U `return` ning yumshoq
+varianti emas, boshqa savolga javob beradi:
+
+  `return`     — hujjatning MAZMUNI xato. Faqat muallif tuzata oladi
+                 (`EDITABLE_STATUSES`), demak hujjat tahrirlanadi va zanjir
+                 boshdan boshlanadi.
+  `send_back`  — hujjat to'g'ri, lekin oldingi bosqich QARORI qayta ko'rilishi
+                 kerak. Hujjat muzlagan holicha qoladi (nishonlar tasdiqlash
+                 bosqichlari, ular `EDITABLE_STATUSES` da yo'q) — mazmun
+                 o'zgarmagani uchun undan oldingi tasdiqlar kuchini saqlaydi.
+
+`send_back` dan keyin zanjir odatdagidek OLDINGA yuradi: xaridlarga qaytgan
+hujjat qaytadan nazorat va buxgalteriyadan o'tadi. "Qaytgan joyidan davom
+etsin" degan qisqartma ataylab qilinmagan — u `anticorruption` ni chetlab
+o'tar edi, u esa to'lovdan oldin turishi shart.
+
 `admin` har bir to'plamda ochiq yozilgan, garchi `is_admin()` tekshiruvi
 baribir birinchi bo'lib ishlasa ham — qoidani o'qiyotgan odam uchun aniqroq.
 """
@@ -83,6 +99,46 @@ WORKFLOW_RULES = {
 }
 
 
+def _derive_approval_chain():
+    """
+    Tasdiqlash bosqichlari haqiqiy tartibda: arxitektura → rais → ... .
+
+    Qo'lda sanalmaydi — `approve` havolalari bo'ylab yurib topiladi, ya'ni
+    zanjirga yangi bosqich qo'shilsa yoki tartib o'zgarsa bu ro'yxat o'zi
+    yangilanadi. `send_back` nishonlari shundan olinadi va shu sababli hech
+    qachon zanjirning haqiqiy tartibidan ajralib qolmaydi.
+    """
+    chain = []
+    status = WORKFLOW_RULES["created"]["submit"]["next_status"]
+    while "approve" in WORKFLOW_RULES.get(status, {}):
+        chain.append(status)
+        status = WORKFLOW_RULES[status]["approve"]["next_status"]
+    return tuple(chain)
+
+
+APPROVAL_CHAIN = _derive_approval_chain()
+
+# Har bir bosqichdan `send_back` qila oladigan nishonlar — faqat O'ZIDAN
+# OLDINGI tasdiqlash bosqichlari. Oldinga (o'zidan keyingi bosqichga)
+# yuborish yo'q: u tasdiqlashni chetlab o'tish bo'lardi. Arxitektura ro'yxatda
+# yo'q — undan oldin tasdiqlash bosqichi yo'q, demak amal ham ko'rinmaydi.
+SEND_BACK_TARGETS = {
+    stage: APPROVAL_CHAIN[:index]
+    for index, stage in enumerate(APPROVAL_CHAIN)
+    if index > 0
+}
+
+# Amal qoidaga alohida yozilmaydi, `return` dan hosil bo'ladi: kim tuzatishga
+# qaytara olsa, o'sha oldingi bosqichga ham qaytara oladi. `next_status`
+# yagona emas — u so'rovda keladi va `targets` bo'yicha tekshiriladi.
+for _stage, _targets in SEND_BACK_TARGETS.items():
+    WORKFLOW_RULES[_stage]["send_back"] = {
+        "next_status": None,
+        "roles": WORKFLOW_RULES[_stage]["return"]["roles"],
+        "targets": _targets,
+    }
+
+
 CONTROL_ROLE = "anticorruption"
 
 # Zanjirda qatnashadigan barcha rollar. Qo'lda sanab chiqilmaydi —
@@ -113,6 +169,7 @@ EDITABLE_STATUSES = {"created", "revision", "rejected"}
 COMMENT_REQUIRED_ACTIONS = {
     "reject": "Rad etishda sabab kiritish majburiy",
     "return": "Tuzatishga qaytarishda sabab kiritish majburiy",
+    "send_back": "Bosqichga qaytarishda sabab kiritish majburiy",
 }
 
 
@@ -140,6 +197,11 @@ WAITING_STATUSES = set(WORKFLOW_RULES) - EDITABLE_STATUSES
 def is_editable(status):
     """Hujjat shu holatda tahrirlanadimi."""
     return status in EDITABLE_STATUSES
+
+
+def send_back_targets_for(status):
+    """Shu bosqichdan qaysi bosqichlarga qaytarish mumkin (tartib bo'yicha)."""
+    return SEND_BACK_TARGETS.get(status, ())
 
 
 def allowed_actions_for(status, roles, is_staff=False):

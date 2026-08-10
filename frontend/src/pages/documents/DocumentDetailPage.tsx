@@ -11,7 +11,7 @@ import { formatBudget, formatDate } from "../objects/siteUtils";
 import { DOCUMENT_MANAGE_ROLES, useHasRole, useIsControlRole } from "../../lib/permissions";
 import { useAuthStore } from "../../stores/authStore";
 import { roleLabel } from "../users/usersUtils";
-import type { DocumentUpdatePayload, WorkflowAction } from "../../types/document";
+import type { DocStatus, DocumentUpdatePayload, WorkflowAction } from "../../types/document";
 
 export default function DocumentDetailPage() {
   const { id } = useParams();
@@ -20,6 +20,9 @@ export default function DocumentDetailPage() {
   // Izoh so'raydigan amal (`reject` yoki `return`) tasdiqlash panelini ochadi.
   const [pendingAction, setPendingAction] = useState<WorkflowAction | null>(null);
   const [comment, setComment] = useState("");
+  // `send_back` da qaysi bosqichga qaytarilishi — ro'yxatni server beradi
+  // (`send_back_targets`), bu yerda faqat tanlov saqlanadi.
+  const [sendBackTarget, setSendBackTarget] = useState("");
   const [receiptWarehouse, setReceiptWarehouse] = useState("");
   const [newComment, setNewComment] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,7 +48,9 @@ export default function DocumentDetailPage() {
       key: `approval-${approval.id}`,
       time: approval.created_at,
       icon: <CheckCheck size={14} />,
-      title: `${actionLabel(approval.action as WorkflowAction)} — ${approval.approver_name || "—"}`,
+      // Bosqichga qaytarishda nishonsiz yozuv tushunarsiz: "kim qaytardi" dan
+      // ko'ra "qayerga qaytardi" muhimroq.
+      title: `${actionLabel(approval.action as WorkflowAction)}${approval.target_status_display ? ` → ${approval.target_status_display}` : ""} — ${approval.approver_name || "—"}`,
       subtitle: approval.approver_roles?.length > 0 ? approval.approver_roles.map(roleLabel).join(", ") : undefined,
       detail: approval.comment,
       action: approval.action as WorkflowAction,
@@ -92,16 +97,26 @@ export default function DocumentDetailPage() {
   // bo'ladi.
   const branchWarehouses = warehouses.filter((warehouse) => warehouse.branch === document.branch);
   const isChoosingWarehouse = pendingAction === "advance";
+  const isSendingBack = pendingAction === "send_back";
+  // Uch xil qaytarish uch xil rangda: rad etish qizil, tuzatishga qaytarish
+  // sariq, bosqichga qaytarish to'q sariq. Ular bir-biriga o'xshamasligi
+  // kerak — oqibatlari ham har xil.
+  const panelTone = pendingAction === "reject"
+    ? { box: "border-red-100 bg-red-50", label: "text-red-700", note: "text-red-700", field: "border-red-200 focus:border-red-500 focus:ring-red-500/20", confirm: "bg-red-600 hover:bg-red-700" }
+    : isSendingBack
+      ? { box: "border-orange-100 bg-orange-50", label: "text-orange-800", note: "text-orange-700", field: "border-orange-200 focus:border-orange-500 focus:ring-orange-500/20", confirm: "bg-orange-600 hover:bg-orange-700" }
+      : { box: "border-yellow-100 bg-yellow-50", label: "text-yellow-800", note: "text-yellow-700", field: "border-yellow-200 focus:border-yellow-500 focus:ring-yellow-500/20", confirm: "bg-yellow-600 hover:bg-yellow-700" };
 
   function resetActionPanel() {
     setPendingAction(null);
     setComment("");
+    setSendBackTarget("");
     setReceiptWarehouse("");
   }
 
-  function runAction(action: WorkflowAction, actionComment?: string, warehouse?: number) {
+  function runAction(action: WorkflowAction, actionComment?: string, warehouse?: number, targetStatus?: DocStatus) {
     workflowAction.mutate(
-      { documentId, payload: { action, comment: actionComment, warehouse } },
+      { documentId, payload: { action, comment: actionComment, warehouse, target_status: targetStatus } },
       { onSuccess: resetActionPanel },
     );
   }
@@ -120,6 +135,10 @@ export default function DocumentDetailPage() {
     if (!pendingAction) return;
     if (pendingAction === "advance") {
       runAction(pendingAction, undefined, receiptWarehouse ? Number(receiptWarehouse) : undefined);
+      return;
+    }
+    if (pendingAction === "send_back") {
+      runAction(pendingAction, comment.trim(), undefined, sendBackTarget as DocStatus);
       return;
     }
     runAction(pendingAction, comment.trim());
@@ -213,26 +232,44 @@ export default function DocumentDetailPage() {
                     type="button"
                     disabled={workflowAction.isPending}
                     onClick={() => handleActionClick(action)}
-                    className={`rounded-xl px-3 py-2 text-sm font-semibold disabled:opacity-60 ${action === "reject" ? "bg-red-50 text-red-700 hover:bg-red-100" : action === "return" ? "bg-yellow-50 text-yellow-800 hover:bg-yellow-100" : "bg-green-600 text-white hover:bg-green-700"}`}
+                    className={`rounded-xl px-3 py-2 text-sm font-semibold disabled:opacity-60 ${action === "reject" ? "bg-red-50 text-red-700 hover:bg-red-100" : action === "return" ? "bg-yellow-50 text-yellow-800 hover:bg-yellow-100" : action === "send_back" ? "bg-orange-50 text-orange-800 hover:bg-orange-100" : "bg-green-600 text-white hover:bg-green-700"}`}
                   >
                     {actionLabel(action)}
                   </button>
                 ))}
               </div>
               {pendingAction && requiresComment(pendingAction) && (
-                <div className={`mt-3 space-y-2 rounded-xl border p-3 ${pendingAction === "reject" ? "border-red-100 bg-red-50" : "border-yellow-100 bg-yellow-50"}`}>
-                  <label className={`block text-xs font-semibold ${pendingAction === "reject" ? "text-red-700" : "text-yellow-800"}`}>
-                    {pendingAction === "reject" ? "Rad etish sababi (majburiy)" : "Nima tuzatilishi kerak (majburiy)"}
+                <div className={`mt-3 space-y-2 rounded-xl border p-3 ${panelTone.box}`}>
+                  {isSendingBack && (
+                    <>
+                      <label className={`block text-xs font-semibold ${panelTone.label}`}>Qaysi bosqich qayta ko'rib chiqsin</label>
+                      {/* Ro'yxatni frontend o'zi tuzmaydi — serverdan keladi,
+                          aks holda zanjir tartibi o'zgarganda eskirardi. */}
+                      <select value={sendBackTarget} onChange={(event) => setSendBackTarget(event.target.value)} className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 ${panelTone.field}`}>
+                        <option value="">Bosqich tanlanmagan</option>
+                        {document.send_back_targets.map((target) => (
+                          <option key={target.value} value={target.value}>{target.label}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                  <label className={`block text-xs font-semibold ${panelTone.label}`}>
+                    {pendingAction === "reject" ? "Rad etish sababi (majburiy)" : isSendingBack ? "Nima qayta ko'rilishi kerak (majburiy)" : "Nima tuzatilishi kerak (majburiy)"}
                   </label>
                   {pendingAction === "return" && (
-                    <p className="text-xs text-yellow-700">
+                    <p className={`text-xs ${panelTone.note}`}>
                       Diqqat: hujjat tuzatishga qaytariladi va qayta yuborilganda zanjir arxitekturadan boshdan boshlanadi — hozirgacha berilgan barcha tasdiqlar qayta so'raladi.
                     </p>
                   )}
-                  <textarea rows={2} value={comment} onChange={(event) => setComment(event.target.value)} className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-gray-900 outline-none ${pendingAction === "reject" ? "border-red-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-yellow-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20"}`} />
+                  {isSendingBack && (
+                    <p className={`text-xs ${panelTone.note}`}>
+                      Hujjat mazmuni o'zgarmaydi va muzlagan holicha qoladi — tanlangan bosqich faqat o'z qarorini qayta ko'radi. Undan keyin zanjir odatdagidek oldinga yuradi, ya'ni nazorat va buxgalteriya qaytadan o'tiladi. Mazmunning o'zi xato bo'lsa "Tuzatishga qaytarish" kerak.
+                    </p>
+                  )}
+                  <textarea rows={2} value={comment} onChange={(event) => setComment(event.target.value)} className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 ${panelTone.field}`} />
                   <div className="flex justify-end gap-2">
                     <button type="button" onClick={resetActionPanel} className="rounded-xl px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-100">Bekor qilish</button>
-                    <button type="button" disabled={!comment.trim() || workflowAction.isPending} onClick={confirmPendingAction} className={`rounded-xl px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60 ${pendingAction === "reject" ? "bg-red-600 hover:bg-red-700" : "bg-yellow-600 hover:bg-yellow-700"}`}>
+                    <button type="button" disabled={!comment.trim() || (isSendingBack && !sendBackTarget) || workflowAction.isPending} onClick={confirmPendingAction} className={`rounded-xl px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60 ${panelTone.confirm}`}>
                       {actionLabel(pendingAction)}
                     </button>
                   </div>

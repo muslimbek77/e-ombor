@@ -193,7 +193,7 @@ class DocumentWorkflowTests(BaseAPITestCase):
         self.auth(self.users["anticorruption"])
         self.assertEqual(
             sorted(self.client.get(url).data["allowed_actions"]),
-            ["approve", "reject", "return"],
+            ["approve", "reject", "return", "send_back"],
         )
 
         self.auth(self.users["accountant"])
@@ -451,6 +451,230 @@ class DocumentReturnTests(BaseAPITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "revision")
+
+
+class DocumentSendBackTests(BaseAPITestCase):
+    """
+    Bosqichga qaytarish (`send_back`) — `return` bilan bir xil emas.
+
+    `return` hujjatning MAZMUNI xato bo'lganda ishlatiladi: tuzatishni faqat
+    muallif kirita oladi, demak hujjat tahrirlanadi va zanjir boshdan
+    boshlanadi. `send_back` esa hujjat to'g'ri, lekin oldingi bosqichning
+    QARORI qayta ko'rilishi kerak bo'lganda: hujjat muzlagan holicha qoladi.
+    """
+
+    def _create_document(self, doc_number, doc_status):
+        return Document.objects.create(
+            doc_number=doc_number,
+            doc_type="purchase_request",
+            title="Bosqichga qaytarish testi",
+            created_by=self.users["branch_manager"],
+            branch=self.branch_a,
+            status=doc_status,
+            total_amount=Decimal("1000.00"),
+        )
+
+    def _act(self, document, payload):
+        return self.client.post(
+            reverse("document-workflow", args=[document.id]), payload, format="json"
+        )
+
+    def test_stage_returns_to_a_chosen_earlier_stage(self):
+        document = self._create_document("XR-2026-1100", "accountant")
+
+        self.auth(self.users["accountant"])
+        response = self._act(
+            document,
+            {"action": "send_back", "target_status": "procurement", "comment": "Yetkazib beruvchi qayta ko'rilsin"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "procurement")
+
+    def test_the_document_stays_frozen(self):
+        """
+        `return` dan asosiy farq shu: mazmun o'zgarmaydi, shuning uchun undan
+        oldingi tasdiqlar kuchini saqlaydi.
+        """
+        document = self._create_document("XR-2026-1101", "accountant")
+
+        self.auth(self.users["accountant"])
+        self._act(
+            document,
+            {"action": "send_back", "target_status": "ceo", "comment": "Rais qayta ko'rsin"},
+        )
+
+        self.auth(self.users["branch_manager"])
+        response = self.client.patch(
+            reverse("document-detail", args=[document.id]), {"total_amount": "9999.00"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        document.refresh_from_db()
+        self.assertEqual(document.total_amount, Decimal("1000.00"))
+
+    def test_the_chain_still_runs_forward_through_control(self):
+        """
+        "Qaytgan joyidan davom etsin" degan qisqartma yo'q — u nazoratni
+        chetlab o'tar edi. Xaridlarga qaytgan hujjat qaytadan nazoratdan
+        o'tadi.
+        """
+        document = self._create_document("XR-2026-1102", "accountant")
+
+        self.auth(self.users["accountant"])
+        self._act(
+            document,
+            {"action": "send_back", "target_status": "procurement", "comment": "Narxni qayta ko'ring"},
+        )
+
+        self.auth(self.users["procurement"])
+        response = self._act(document, {"action": "approve"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "anticorruption")
+
+    def test_forward_stages_are_not_a_valid_target(self):
+        """Oldinga yuborish tasdiqlashni chetlab o'tish bo'lardi."""
+        document = self._create_document("XR-2026-1103", "ceo")
+
+        self.auth(self.users["ceo"])
+        response = self._act(
+            document,
+            {"action": "send_back", "target_status": "accountant", "comment": "Buxgalteriya ko'rsin"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        document.refresh_from_db()
+        self.assertEqual(document.status, "ceo")
+
+    def test_the_target_must_be_a_real_stage(self):
+        document = self._create_document("XR-2026-1104", "accountant")
+
+        self.auth(self.users["accountant"])
+        for target in ("", "revision", "closed", "yo'q-bosqich"):
+            with self.subTest(target=target):
+                response = self._act(
+                    document,
+                    {"action": "send_back", "target_status": target, "comment": "Sabab"},
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_the_first_stage_has_nothing_to_send_back_to(self):
+        document = self._create_document("XR-2026-1105", "architecture")
+
+        self.auth(self.users["architecture"])
+        response = self._act(
+            document,
+            {"action": "send_back", "target_status": "architecture", "comment": "Sabab"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertNotIn("send_back", response.data.get("allowed_actions", []))
+
+    def test_send_back_requires_a_comment(self):
+        document = self._create_document("XR-2026-1106", "accountant")
+
+        self.auth(self.users["accountant"])
+        response = self._act(document, {"action": "send_back", "target_status": "procurement"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        document.refresh_from_db()
+        self.assertEqual(document.status, "accountant")
+
+    def test_wrong_role_cannot_send_back(self):
+        document = self._create_document("XR-2026-1107", "accountant")
+
+        self.auth(self.users["procurement"])
+        response = self._act(
+            document,
+            {"action": "send_back", "target_status": "ceo", "comment": "Sabab"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_execution_stages_have_no_send_back(self):
+        for index, stage in enumerate(("delivering", "received", "closed")):
+            with self.subTest(stage=stage):
+                document = self._create_document(f"XR-2026-111{index}", stage)
+
+                self.auth(self.users["admin"])
+                response = self._act(
+                    document,
+                    {"action": "send_back", "target_status": "ceo", "comment": "Sabab"},
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_the_trail_records_the_target(self):
+        """Tarixda "buxgalteriya xaridlarga qaytardi" degani ko'rinishi kerak."""
+        document = self._create_document("XR-2026-1120", "accountant")
+
+        self.auth(self.users["accountant"])
+        response = self._act(
+            document,
+            {"action": "send_back", "target_status": "procurement", "comment": "Narx asoslanmagan"},
+        )
+
+        approval = response.data["approvals"][0]
+        self.assertEqual(approval["action"], "send_back")
+        self.assertEqual(approval["target_status"], "procurement")
+        self.assertEqual(approval["target_status_display"], "XARIDLARDA")
+        self.assertEqual(approval["comment"], "Narx asoslanmagan")
+
+    def test_offered_targets_match_the_server_rules(self):
+        """
+        Frontend nishonlar ro'yxatini o'zi tuzmaydi — serverdan oladi, aks
+        holda zanjir tartibi o'zgarganda ro'yxat jimgina eskirardi.
+        """
+        document = self._create_document("XR-2026-1121", "anticorruption")
+
+        self.auth(self.users["anticorruption"])
+        response = self.client.get(reverse("document-detail", args=[document.id]))
+
+        self.assertIn("send_back", response.data["allowed_actions"])
+        self.assertEqual(
+            [target["value"] for target in response.data["send_back_targets"]],
+            ["architecture", "ceo", "procurement"],
+        )
+
+    def test_control_role_can_send_back_at_its_own_stage(self):
+        document = self._create_document("XR-2026-1122", "anticorruption")
+
+        self.auth(self.users["anticorruption"])
+        response = self._act(
+            document,
+            {"action": "send_back", "target_status": "ceo", "comment": "Rais qayta ko'rsin"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "ceo")
+
+    def test_control_role_cannot_send_back_at_another_stage(self):
+        """Zanjirdagi istisno nazoratga boshqa bosqichni ochib bermaydi."""
+        document = self._create_document("XR-2026-1123", "accountant")
+
+        self.auth(self.users["anticorruption"])
+        response = self._act(
+            document,
+            {"action": "send_back", "target_status": "ceo", "comment": "Sabab"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_send_back_notifies_the_branch_with_the_reason(self):
+        document = self._create_document("XR-2026-1124", "accountant")
+        Notification.objects.all().delete()
+
+        self.auth(self.users["accountant"])
+        self._act(
+            document,
+            {"action": "send_back", "target_status": "procurement", "comment": "Narx asoslanmagan"},
+        )
+
+        notification = Notification.objects.filter(
+            user=self.users["procurement"], title="Hujjat qayta ko'rib chiqishga qaytarildi"
+        ).first()
+        self.assertIsNotNone(notification, "Nishon bosqichdagi rol xabardor bo'lishi kerak")
+        self.assertIn("Narx asoslanmagan", notification.message)
 
 
 class DocumentReceiptTests(BaseAPITestCase):

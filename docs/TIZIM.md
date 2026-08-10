@@ -283,8 +283,9 @@ edi va ajralib qolsa foydalanuvchiga bosilganda 403 beradigan tugma
 ko'rinardi.
 
 Bosqichlar ikki turga bo'linadi: **tasdiqlash** bosqichlari (`approve` /
-`return` / `reject` — mas'ul rol qaror qabul qiladi) va **bajarish**
-bosqichlari (`advance` / `close` — qaror emas, faktni qayd etish).
+`return` / `send_back` / `reject` — mas'ul rol qaror qabul qiladi) va
+**bajarish** bosqichlari (`advance` / `close` — qaror emas, faktni qayd
+etish).
 
 Zanjirdagi to'rtta tasdiq — arxitektura, rais, xaridlar, nazorat — ketma-ket
 va chetlab o'tib bo'lmaydi. Nazorat (`anticorruption`) ataylab **buxgalteriyadan
@@ -310,6 +311,10 @@ stateDiagram-v2
     accountant --> delivering: approve (accountant)
     accountant --> revision: return (accountant)
     accountant --> rejected: reject (accountant)
+    ceo --> architecture: send_back (ceo)
+    procurement --> ceo: send_back (procurement)
+    anticorruption --> procurement: send_back (anticorruption)
+    accountant --> anticorruption: send_back (accountant)
     delivering --> received: advance (warehouse)
     received --> closed: close (warehouse, prorab)
     rejected --> created: reopen (procurement, prorab)
@@ -326,15 +331,19 @@ to'g'ridan-to'g'ri aksi:
 | `architecture` | `approve` | `ceo` | arxitektura |
 | `architecture` | `return` | `revision` | arxitektura |
 | `architecture` | `reject` | `rejected` | arxitektura |
+| `ceo` | `send_back` | `architecture` | ceo |
 | `ceo` | `approve` | `procurement` | ceo |
 | `ceo` | `return` | `revision` | ceo |
 | `ceo` | `reject` | `rejected` | ceo |
+| `procurement` | `send_back` | oldingi bosqichlardan biri | xaridlar |
 | `procurement` | `approve` | `anticorruption` | xaridlar |
 | `procurement` | `return` | `revision` | xaridlar |
 | `procurement` | `reject` | `rejected` | xaridlar |
+| `anticorruption` | `send_back` | oldingi bosqichlardan biri | nazorat |
 | `anticorruption` | `approve` | `accountant` | nazorat |
 | `anticorruption` | `return` | `revision` | nazorat |
 | `anticorruption` | `reject` | `rejected` | nazorat |
+| `accountant` | `send_back` | oldingi bosqichlardan biri | buxgalter |
 | `accountant` | `approve` | `delivering` | buxgalter |
 | `accountant` | `return` | `revision` | buxgalter |
 | `accountant` | `reject` | `rejected` | buxgalter |
@@ -344,8 +353,15 @@ to'g'ridan-to'g'ri aksi:
 
 `admin` har qanday o'tishni bajara oladi — jadvalda alohida ko'rsatilmagan.
 
+`send_back` nishoni jadvalda ham, diagrammada ham qat'iy emas — ikkalasida
+qisqartirib bitta qadam orqaga ko'rsatilgan. Aslida nishon so'rovda keladi va
+o'sha bosqichdan OLDINGI istalgan tasdiqlash bosqichi bo'la oladi: masalan
+buxgalteriya to'g'ridan-to'g'ri arxitekturaga qaytara oladi. Ro'yxat
+`SEND_BACK_TARGETS` da, zanjirning o'zidan hosil bo'ladi. `architecture` da bu
+amal yo'q: undan oldin tasdiqlash bosqichi yo'q.
+
 Jadvalda yo'q narsa ham ma'noli: `delivering` va `received` holatlarida na
-`reject`, na `return` bor. Tovar yo'lga chiqqach yoki omborga kirgach hujjatni
+`reject`, na `return`, na `send_back` bor. Tovar yo'lga chiqqach yoki omborga kirgach hujjatni
 orqaga surib bo'lmaydi — bunday holat qoldiqni hujjat holatidan ajratib
 yuborardi. `closed` esa yakuniy: undan hech qayerga o'tilmaydi.
 
@@ -370,11 +386,46 @@ Qaytargan foydalanuvchi hujjat qayta yuborilganda bildirishnoma oladi
 boshiga qaytgan so'rovni bir necha bosqichdan keyin ko'radi va u vaqtgacha
 uni unutib qo'ymasligi kerak.
 
+### `send_back` — bosqichga qaytarish
+
+`return` hujjatning **mazmuni** xato bo'lganda ishlatiladi. Lekin ba'zan hujjat
+to'g'ri, xatosi oldingi bosqichning **qarorida**: xaridlar shoshib tasdiqlagan,
+buxgalter esa qayta ko'rishni so'ramoqchi. `return` bu holatda noto'g'ri
+vosita — u aybi yo'q muallifni tuzatishga jo'natadi va zanjirni boshdan
+boshlaydi.
+
+`send_back` shu bo'shliqni yopadi:
+
+| | `return` | `send_back` |
+|---|---|---|
+| Xato qayerda | hujjat mazmunida | oldingi bosqich qarorida |
+| Keyingi holat | `revision` | tanlangan oldingi tasdiqlash bosqichi |
+| Hujjat tahrirlanadimi | ha | **yo'q**, muzlagan holicha qoladi |
+| Kim tuzatadi | muallif | nishondagi rol |
+| Keyin nima bo'ladi | zanjir boshdan | zanjir nishondan oldinga |
+
+Hujjat muzlagan qolishi tasodif emas — bu amalning butun asosi. Mazmun
+o'zgarmagani uchun nishondan oldingi tasdiqlar kuchini saqlaydi va zanjirni
+boshdan boshlashning hojati yo'q.
+
+Nishondan keyin zanjir **odatdagidek oldinga** yuradi. "Qaytgan joyidan davom
+etsin" degan qisqartma ataylab qilinmagan: u `anticorruption` ni chetlab
+o'tar edi, u esa to'lovdan oldin turishi shart. Ya'ni xaridlarga qaytgan
+hujjat qaytadan nazoratdan va buxgalteriyadan o'tadi.
+
+Kim `return` qila olsa, `send_back` ni ham qila oladi — amal qoidaga alohida
+yozilmaydi, `return` dan hosil bo'ladi. Nishon `DocumentApproval.target_status`
+da saqlanadi: tarixda "buxgalteriya xaridlarga qaytardi" degani ko'rinib
+turishi kerak.
+
 Qoidalar:
 
 - Holatda mavjud bo'lmagan amal → 400 (`"Bu holatda ushbu amal mavjud emas"`).
+- `send_back` da ruxsat etilmagan nishon → 400 (`"Bu bosqichga qaytarib
+  bo'lmaydi"`). Oldinga yuborish ham shu yerga tushadi — u tasdiqlashni
+  chetlab o'tish bo'lardi.
 - Roli mos kelmasa → 403.
-- **`reject` va `return` da sabab majburiy** — izohsiz 400 qaytadi
+- **`reject`, `return` va `send_back` da sabab majburiy** — izohsiz 400 qaytadi
   (`workflow.py: COMMENT_REQUIRED_ACTIONS`). Nima tuzatilishi kerakligini
   aytmasdan qaytarish foydalanuvchini boshi berk ko'chaga olib boradi.
 - Har o'tish `DocumentApproval` yozuvi va audit logi qoldiradi.

@@ -43,7 +43,7 @@ export function isDocumentEditable(status: DocStatus) {
  * Izohsiz yuborilmaydigan amallar — server ikkalasida ham 400 qaytaradi
  * (`workflow.py: COMMENT_REQUIRED_ACTIONS`).
  */
-export const COMMENT_REQUIRED_ACTIONS: WorkflowAction[] = ["reject", "return"];
+export const COMMENT_REQUIRED_ACTIONS: WorkflowAction[] = ["reject", "return", "send_back"];
 
 export function requiresComment(action: WorkflowAction) {
   return COMMENT_REQUIRED_ACTIONS.includes(action);
@@ -117,6 +117,9 @@ const ACTION_LABELS: Record<WorkflowAction, string> = {
   reject: "Rad etish",
   // "Rad etildi" emas, "tuzatib qayta yuboring" — farq shu ikki so'zda.
   return: "Tuzatishga qaytarish",
+  // "Tuzatishga" emas "bosqichga": hujjat o'zgarmaydi, oldingi bosqich
+  // qarorini qayta ko'radi.
+  send_back: "Bosqichga qaytarish",
   reopen: "Qayta ochish",
 };
 
@@ -136,6 +139,7 @@ const ACTION_CARD_STYLES: Record<WorkflowAction, string> = {
   close: "border-green-100 bg-green-50",
   reject: "border-red-200 bg-red-50",
   return: "border-yellow-200 bg-yellow-50",
+  send_back: "border-orange-200 bg-orange-50",
   reopen: "border-gray-200 bg-gray-50",
 };
 
@@ -146,6 +150,7 @@ const ACTION_ICON_STYLES: Record<WorkflowAction, string> = {
   close: "text-green-600",
   reject: "text-red-600",
   return: "text-yellow-700",
+  send_back: "text-orange-600",
   reopen: "text-gray-500",
 };
 
@@ -156,6 +161,7 @@ const ACTION_TITLE_STYLES: Record<WorkflowAction, string> = {
   close: "text-gray-800",
   reject: "text-red-800",
   return: "text-yellow-900",
+  send_back: "text-orange-900",
   reopen: "text-gray-800",
 };
 
@@ -175,6 +181,7 @@ export function activityTitleClass(action?: WorkflowAction) {
 export function activityDetailClass(action?: WorkflowAction) {
   if (action === "reject") return "text-sm font-medium text-red-700";
   if (action === "return") return "text-sm font-medium text-yellow-800";
+  if (action === "send_back") return "text-sm font-medium text-orange-800";
   return "text-xs text-gray-500";
 }
 

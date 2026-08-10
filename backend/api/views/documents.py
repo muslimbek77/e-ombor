@@ -130,7 +130,21 @@ class DocumentWorkflowActionView(APIView):
 
         previous_status = document.status
         previous_status_label = document.get_status_display()
-        next_status = rule["next_status"]
+        # `send_back` — yagona `next_status` i yo'q amal: nishonni foydalanuvchi
+        # tanlaydi. Tanlov qoidadagi ro'yxat bilan tekshiriladi, ya'ni faqat
+        # o'zidan oldingi tasdiqlash bosqichi bo'la oladi — aks holda bu amal
+        # zanjirdan sakrab o'tishning yo'liga aylanardi.
+        target_status = serializer.validated_data.get("target_status", "").strip()
+        if action == "send_back":
+            if target_status not in rule["targets"]:
+                return Response(
+                    {"error": "Bu bosqichga qaytarib bo'lmaydi"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            next_status = target_status
+        else:
+            target_status = ""
+            next_status = rule["next_status"]
 
         try:
             with transaction.atomic():
@@ -150,6 +164,7 @@ class DocumentWorkflowActionView(APIView):
                     document=document,
                     approver=request.user,
                     action=action,
+                    target_status=target_status,
                     comment=comment,
                 )
         except ReceiptError as exc:
@@ -160,7 +175,13 @@ class DocumentWorkflowActionView(APIView):
             "document_workflow_changed",
             "Document",
             document.id,
-            {"from": previous_status, "to": document.status, "action": action, "comment": comment},
+            {
+                "from": previous_status,
+                "to": document.status,
+                "action": action,
+                "target_status": target_status,
+                "comment": comment,
+            },
         )
         if movements:
             create_audit_log(
@@ -179,6 +200,22 @@ class DocumentWorkflowActionView(APIView):
             self._notify_returners(document, request.user)
 
         recipients = [document.created_by]
+        # Bosqichga qaytarish umumiy "holat yangilandi" xabari ostida
+        # yo'qolmasligi kerak: nishon bosqichdan qayta qaror kutilmoqda va
+        # sababi aynan izohda.
+        if action == "send_back":
+            branch_title = "Hujjat qayta ko'rib chiqishga qaytarildi"
+            branch_body = (
+                f"{document.doc_number} hujjati {previous_status_label} dan "
+                f"{document.get_status_display()} ga qayta ko'rib chiqish uchun "
+                f"qaytarildi. Sabab: {comment}"
+            )
+        else:
+            branch_title = "Hujjat holati yangilandi"
+            branch_body = (
+                f"{document.doc_number} hujjati {previous_status_label} dan "
+                f"{document.get_status_display()} ga o'tdi."
+            )
         notify_branch_roles(
             document.branch,
             {
@@ -191,9 +228,9 @@ class DocumentWorkflowActionView(APIView):
                 "branch_manager",
                 "admin",
             },
-            "Hujjat holati yangilandi",
-            f"{document.doc_number} hujjati {previous_status_label} dan {document.get_status_display()} ga o'tdi.",
-            "info" if document.status != "rejected" else "warning",
+            branch_title,
+            branch_body,
+            "info" if document.status not in {"rejected"} and action != "send_back" else "warning",
             related_type="document",
             related_id=document.id,
         )

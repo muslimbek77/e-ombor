@@ -74,8 +74,18 @@ kerak bo'ladi.
 hujjat `revision` ga tushadi, tuzatiladi va `submit` bilan zanjirni
 arxitekturadan qaytadan boshlaydi. Qaytadan boshlanishi ataylab — summa
 o'zgargan bo'lsa oldingi tasdiqlar boshqa hujjatga tegishli bo'lib qoladi.
-`reject` va `return` da izoh majburiy (`workflow.py:
+`reject`, `return` va `send_back` da izoh majburiy (`workflow.py:
 COMMENT_REQUIRED_ACTIONS`).
+
+**`send_back` — `return` emas.** `return` mazmun xato bo'lganda: hujjat
+`revision` ga tushadi, tahrirlanadi, zanjir boshdan. `send_back` esa oldingi
+bosqichning qarori qayta ko'rilishi kerak bo'lganda: hujjat **muzlagan
+holicha** tanlangan oldingi tasdiqlash bosqichiga qaytadi va u yerdan zanjir
+odatdagidek oldinga yuradi. Muzlagan qolishi amalning asosi — mazmun
+o'zgarmagani uchun oldingi tasdiqlar kuchini saqlaydi. Nishonlar ro'yxati
+`workflow.py: SEND_BACK_TARGETS` da, `approve` havolalaridan hosil bo'ladi;
+faqat o'zidan oldingi bosqichlar. "Qaytgan joyidan davom etsin" degan
+qisqartma qo'shilmaydi — u `anticorruption` ni chetlab o'tadi.
 
 **Qabul qoldiqni o'zgartiradi.** `delivering → received` (`advance`) hujjatning
 xarid qatorlarini omborga kirim qiladi (`stock.py: receive_purchase_items`) —

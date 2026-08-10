@@ -285,7 +285,11 @@ class DocumentApproval(models.Model):
     
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='approvals')
     approver = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='approvals')
-    action = models.CharField(max_length=20)  # approved, rejected
+    action = models.CharField(max_length=20)  # approve, reject, return, send_back va h.k.
+    # Faqat `send_back` uchun: qaysi bosqichga qaytarilgani. Amalning o'zi
+    # nishonni bildirmaydi (boshqa amallarda nishon qoidada qat'iy), tarixda
+    # esa "buxgalteriya xaridlarga qaytardi" degani ko'rinib turishi kerak.
+    target_status = models.CharField(max_length=20, blank=True)
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
