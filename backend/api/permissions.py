@@ -15,6 +15,7 @@ from rest_framework import permissions
 
 from .roles import (
     ADMIN_ROLES,
+    DOCUMENT_MANAGE_ROLES,
     INVOICE_ROLES,
     PAYMENT_ROLES,
     SITE_ROLES,
@@ -112,3 +113,17 @@ class InvoiceWrite(RoleGatedWrite):
 class PaymentWrite(RoleGatedWrite):
     write_roles = PAYMENT_ROLES
     message = "To'lov qayd etish uchun sizda ruxsat yo'q"
+
+
+class DocumentCreateWrite(RoleGatedWrite):
+    """
+    Yangi hujjatni faqat `DOCUMENT_MANAGE_ROLES` yaratadi.
+
+    Zanjirning boshlanish nuqtasi — filial rahbari so'rovni yaratadi va
+    o'zi arxitekturaga jo'natadi (`workflow.py: "created" -> "submit"`).
+    Ro'yxatni ko'rish (GET) bunga tegishli emas: filialdagi boshqa rollar
+    hujjatni ko'ra oladi, faqat yarata olmaydi.
+    """
+
+    write_roles = DOCUMENT_MANAGE_ROLES
+    message = "Hujjat yaratish uchun sizda ruxsat yo'q"

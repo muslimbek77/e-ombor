@@ -131,7 +131,7 @@ class NumberGenerationTests(BaseAPITestCase):
         Ikkita hujjat yaratib birinchisini o'chirsak, sanoq 1 ga tushadi va
         keyingi hujjat ikkinchisining raqamini talab qiladi.
         """
-        self.auth(self.users["procurement"])
+        self.auth(self.users["branch_manager"])
         url = reverse("document-list-create")
         payload = {"doc_type": "purchase_request", "title": "Hujjat"}
 
@@ -151,7 +151,7 @@ class NumberGenerationTests(BaseAPITestCase):
         self.assertNotEqual(third.data["doc_number"], second.data["doc_number"])
 
     def test_document_numbers_are_unique_across_many_creations(self):
-        self.auth(self.users["procurement"])
+        self.auth(self.users["branch_manager"])
         url = reverse("document-list-create")
 
         numbers = set()

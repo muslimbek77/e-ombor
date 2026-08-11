@@ -20,6 +20,7 @@ from ..models import (
 )
 from ..notifications import notify_branch_roles, notify_users
 from ..numbering import build_document_number, save_with_unique_number
+from ..permissions import DEFAULT_PERMISSIONS, DocumentCreateWrite
 from ..roles import ARCHIVE_ROLES, DOCUMENT_MANAGE_ROLES, has_any_role, is_admin
 from ..scope import branch_scope, filter_by_query_params
 from ..serializers import (
@@ -36,7 +37,8 @@ from ..workflow import COMMENT_REQUIRED_ACTIONS, WORKFLOW_RULES
 class DocumentListCreateView(generics.ListCreateAPIView):
     """Hujjatlar ro'yxati va yaratish."""
     serializer_class = DocumentSerializer
-    
+    permission_classes = DEFAULT_PERMISSIONS + (DocumentCreateWrite,)
+
     def get_queryset(self):
         user = self.request.user
         queryset = branch_scope(
