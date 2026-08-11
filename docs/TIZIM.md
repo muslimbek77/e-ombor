@@ -147,7 +147,7 @@ bo'lib `True` qaytaradi, ya'ni admin hamma katakda ✅.
 | To'lov | — | — | — | ✅ | — | — | — |
 | Zaxira va ombor harakati | — | — | — | — | ✅ | — | — |
 | Ombor harakatini o'chirish | — | — | — | — | — | — | — |
-| Hujjat yaratish | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Hujjat yaratish | — | — | — | — | — | — | ✅ |
 | Hujjatni tahrirlash/o'chirish | muallif | muallif | muallif | muallif | muallif | muallif | ✅ |
 | Hujjatni arxivlash | — | — | ✅ | — | — | — | ✅ |
 | Zayavka: mazmun (muallif, `pending`da) | — | — | — | — | — | muallif | — |
@@ -204,9 +204,13 @@ roldan farqi yo'q.
 **Xarid buyurtmasi** endi filial rahbariga ham ochiq: yangi oqimda so'rovni
 u boshlaydi, va material qatorlarisiz so'rovning mazmuni bo'lmaydi.
 
-Uch qator izoh talab qiladi. **Hujjat yaratish** ochiq: oqim shu bilan
-boshlanadi va uni kim boshlashi keyingi bosqichdagi rol tekshiruvi bilan
-ajratiladi, yaratish huquqi bilan emas. **Ombor harakati** esa umuman
+Uch qator izoh talab qiladi. **Hujjat yaratish** endi `DocumentCreateWrite`
+(`permissions.py`) bilan `DOCUMENT_MANAGE_ROLES` ga cheklangan — oqim aynan
+filial rahbaridan boshlanadi (`workflow.py: "created" -> "submit"`), boshqa
+rol hujjatni birinchi bo'lib yarata olmaydi. Ilgari yaratish hamma rolga
+ochiq edi va faqat keyingi bosqichdagi (`submit`) rol tekshiruvi bilan
+ajratilardi — bu amalda "istalgan xodim hujjat boshlay oladi" degani edi,
+zanjirning boshlanish nuqtasiga mos kelmasdi. **Ombor harakati** esa umuman
 o'chirilmaydi: `urls.py` da faqat `stock-movements/` ro'yxat-yaratish yo'li
 bor, tafsilot endpointi yo'q. Ya'ni qayd kiritilgach, uni hech kim — hatto
 admin ham — API orqali o'chira olmaydi. Xato kiritilgan harakat teskari
