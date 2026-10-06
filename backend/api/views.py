@@ -590,7 +590,12 @@ class DashboardView(APIView):
     def get(self, request):
         user = request.user
 
-        documents = branch_scope(Document.objects.select_related("created_by", "site", "branch"), user)
+        documents = branch_scope(
+            Document.objects.select_related("created_by", "site", "branch").prefetch_related(
+                "approvals__approver"
+            ),
+            user,
+        )
         sites = branch_scope(ConstructionSite.objects.select_related("branch", "prorab"), user)
         warehouses = branch_scope(Warehouse.objects.select_related("branch"), user)
         inventory = branch_scope(
